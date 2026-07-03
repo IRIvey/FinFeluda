@@ -18,7 +18,7 @@ tenacity                # retry wrapper around Groq calls
 
 # --- RAG / vector store ---
 qdrant-client
-fastembed               # ONNX embeddings, no torch -> light enough for free tier
+fastembed               # ONNX dense + sparse(BM25) embeddings + cross-encoder reranking, no torch
 
 # --- Document ingestion ---
 pymupdf                 # fast PDF text extraction
