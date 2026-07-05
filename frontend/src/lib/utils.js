@@ -4,11 +4,12 @@ export function cn(...classes) {
 
 export function formatCurrency(value, currency = "USD") {
   if (value === null || value === undefined) return "—";
+  const isCompact = Math.abs(value) >= 1_000_000;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
-    notation: Math.abs(value) >= 1_000_000 ? "compact" : "standard",
-    maximumFractionDigits: 1,
+    notation: isCompact ? "compact" : "standard",
+    maximumFractionDigits: isCompact ? 1 : 0,
   }).format(value);
 }
 
