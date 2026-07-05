@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { Navbar } from "./components/layout/Navbar";
 import { HomePage } from "./pages/HomePage";
+import { NewInvestigationPage } from "./pages/NewInvestigationPage";
 
 function RootLayout() {
   return (
@@ -16,6 +17,7 @@ export const router = createBrowserRouter([
     element: <RootLayout />,
     children: [
       { path: "/", element: <HomePage /> },
+      { path: "/new", element: <NewInvestigationPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
