@@ -6,7 +6,12 @@ import { cn } from "../../lib/utils";
  * used throughout the investigation dashboard so a card's evidentiary
  * weight or severity is visible at a glance, not just in its text.
  */
-export function Card({ title, footer, tier, className, children, ...props }) {
+const PADDING = {
+  md: "p-6",
+  sm: "p-4",
+};
+
+export function Card({ title, footer, tier, padding = "md", className, children, ...props }) {
   return (
     <div
       className={cn(
@@ -28,7 +33,7 @@ export function Card({ title, footer, tier, className, children, ...props }) {
           <h3 className="text-sm font-semibold text-ink">{title}</h3>
         </div>
       )}
-      <div className={cn(!title && !footer && "p-6", title && "p-6", "empty:p-0")}>{children}</div>
+      <div className={cn(PADDING[padding], "empty:p-0")}>{children}</div>
       {footer && <div className="border-t border-line px-6 py-4">{footer}</div>}
     </div>
   );

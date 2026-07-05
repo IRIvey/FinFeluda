@@ -3,6 +3,7 @@ import { Navbar } from "./components/layout/Navbar";
 import { HomePage } from "./pages/HomePage";
 import { NewInvestigationPage } from "./pages/NewInvestigationPage";
 import { ProcessingPage } from "./pages/ProcessingPage";
+import { InvestigationPage } from "./pages/InvestigationPage";
 
 function RootLayout() {
   return (
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
       { path: "/", element: <HomePage /> },
       { path: "/new", element: <NewInvestigationPage /> },
       { path: "/investigations/:id/processing", element: <ProcessingPage /> },
+      { path: "/investigations/:id", element: <InvestigationPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
