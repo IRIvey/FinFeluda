@@ -4,6 +4,7 @@ import { HomePage } from "./pages/HomePage";
 import { NewInvestigationPage } from "./pages/NewInvestigationPage";
 import { ProcessingPage } from "./pages/ProcessingPage";
 import { InvestigationPage } from "./pages/InvestigationPage";
+import { ChatPage } from "./pages/ChatPage";
 
 function RootLayout() {
   return (
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
       { path: "/new", element: <NewInvestigationPage /> },
       { path: "/investigations/:id/processing", element: <ProcessingPage /> },
       { path: "/investigations/:id", element: <InvestigationPage /> },
+      { path: "/investigations/:id/chat", element: <ChatPage /> },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },
