@@ -1,5 +1,10 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from typing import List, Optional
+
+# Resolve .env relative to this file (backend/), not the process's cwd --
+# uvicorn may be launched from the repo root rather than backend/.
+_ENV_FILE = Path(__file__).resolve().parent.parent.parent / ".env"
 
 
 class Settings(BaseSettings):
@@ -38,7 +43,7 @@ class Settings(BaseSettings):
     SERPER_API_KEY: Optional[str] = None  # Google Search via serper.dev free tier
 
     class Config:
-        env_file = ".env"
+        env_file = _ENV_FILE
 
     @property
     def allowed_origins(self) -> List[str]:

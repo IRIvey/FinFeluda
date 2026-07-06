@@ -11,6 +11,7 @@ sqlalchemy[asyncio]
 asyncpg
 alembic
 greenlet
+aiosqlite               # local dev/demo fallback when DATABASE_URL isn't configured
 
 # --- AI / LLM ---
 groq
