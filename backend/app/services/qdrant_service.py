@@ -26,7 +26,9 @@ section at the bottom -- use those wrappers from async code, never
 the sync functions directly.
 """
 import asyncio
+import logging
 from collections import defaultdict
+from pathlib import Path
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, VectorParams, SparseVectorParams, PointStruct,
@@ -41,7 +43,19 @@ if TYPE_CHECKING:
 
 EMBEDDING_DIM = 384  # BAAI/bge-small-en-v1.5 dense output size
 
-client = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
+if settings.QDRANT_URL:
+    client = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
+else:
+    # No Qdrant Cloud configured -- qdrant-client can run fully embedded
+    # against a local on-disk store, so gather/normalize can still run
+    # end-to-end for local dev/demo. Set QDRANT_URL/QDRANT_API_KEY in
+    # backend/.env for real hybrid search at deploy time.
+    _backend_dir = Path(__file__).resolve().parent.parent.parent
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        "QDRANT_URL not set -- using local embedded Qdrant storage (backend/qdrant_data)."
+    )
+    client = QdrantClient(path=str(_backend_dir / "qdrant_data"))
 
 
 def ensure_collection():

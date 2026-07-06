@@ -14,6 +14,11 @@ htmlcov/
 # Backend env
 backend/.env
 
+# Local dev fallback storage (used when DATABASE_URL/QDRANT_URL aren't
+# configured -- see backend/app/core/database.py and qdrant_service.py)
+dev.db
+qdrant_data/
+
 # ─────────────────────────────
 # Frontend (Node / Vite / React)
 # ─────────────────────────────
