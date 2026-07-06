@@ -7,6 +7,8 @@ import { InvestigationPage } from "./pages/InvestigationPage";
 import { ChatPage } from "./pages/ChatPage";
 import { ReportPage } from "./pages/ReportPage";
 import { ComparePage } from "./pages/ComparePage";
+import { SourcesPage } from "./pages/SourcesPage";
+import { RiskCategoryPage } from "./pages/RiskCategoryPage";
 
 function RootLayout() {
   return (
@@ -25,6 +27,8 @@ export const router = createBrowserRouter([
       { path: "/new", element: <NewInvestigationPage /> },
       { path: "/investigations/:id/processing", element: <ProcessingPage /> },
       { path: "/investigations/:id", element: <InvestigationPage /> },
+      { path: "/investigations/:id/sources", element: <SourcesPage /> },
+      { path: "/investigations/:id/risks/:category", element: <RiskCategoryPage /> },
       { path: "/investigations/:id/chat", element: <ChatPage /> },
       { path: "/investigations/:id/report", element: <ReportPage /> },
       { path: "/compare", element: <ComparePage /> },

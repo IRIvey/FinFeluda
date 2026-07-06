@@ -52,6 +52,14 @@ export const CONFIDENCE_TIER_META = {
   4: { label: "Unverified signal", color: "tier-4" },
 };
 
+export function formatSourceType(type) {
+  if (!type) return "Source";
+  return type
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
 export function scoreTone(score) {
   if (score === null || score === undefined) return "tier-4";
   if (score >= 75) return "tier-1";

@@ -4,6 +4,7 @@ import { cn } from "../../lib/utils";
 export function Sidebar({ investigationId, companyName }) {
   const links = [
     { to: `/investigations/${investigationId}`, label: "Overview", end: true },
+    { to: `/investigations/${investigationId}/sources`, label: "Sources" },
     { to: `/investigations/${investigationId}/chat`, label: "Ask AI" },
     { to: `/investigations/${investigationId}/report`, label: "Report" },
   ];

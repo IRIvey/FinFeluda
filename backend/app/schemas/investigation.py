@@ -51,6 +51,18 @@ class ReportRefOut(BaseModel):
     pdf_url: Optional[str] = None
 
 
+class SourceOut(BaseModel):
+    """One public/uploaded source the GATHER stage actually fetched
+    and stored chunks from, for the Sources page -- lets the user
+    follow the same trail the AI did."""
+
+    source_type: str
+    source_name: str
+    origin_url: Optional[str] = None
+    confidence_tier: int
+    chunk_count: int
+
+
 class InvestigationDetailOut(InvestigationOut):
     """
     Full detail response for GET /investigations/{id}. Every nested

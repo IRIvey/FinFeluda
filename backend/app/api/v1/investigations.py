@@ -19,7 +19,9 @@ from app.schemas.investigation import (
     RiskAnalysisOut,
     ExecutiveSummaryOut,
     ReportRefOut,
+    SourceOut,
 )
+from app.services.qdrant_service import get_all_chunks_for_investigation_async
 from typing import List
 
 router = APIRouter()
@@ -99,6 +101,38 @@ async def get_investigation(investigation_id: str, db: AsyncSession = Depends(ge
         recommendations=(report.recommendations_json if report else None) or [],
         report=ReportRefOut(pdf_url=report.pdf_url) if report else None,
     )
+
+
+@router.get("/{investigation_id}/sources", response_model=List[SourceOut])
+async def get_investigation_sources(investigation_id: str, db: AsyncSession = Depends(get_database)):
+    """
+    Every source the GATHER stage actually fetched content from for
+    this investigation (public sources + the company site + any
+    uploaded PDFs), deduplicated from the chunks stored in Qdrant. Lets
+    a user follow the same trail the AI used instead of just trusting
+    its conclusions.
+    """
+    investigation = await db.get(Investigation, investigation_id)
+    if investigation is None:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+
+    chunks = await get_all_chunks_for_investigation_async(investigation_id)
+
+    grouped: dict[tuple, dict] = {}
+    for chunk in chunks:
+        key = (chunk.get("source_name"), chunk.get("origin_url"))
+        if key not in grouped:
+            grouped[key] = {
+                "source_type": chunk.get("source_type", "unknown"),
+                "source_name": chunk.get("source_name", "Unknown source"),
+                "origin_url": chunk.get("origin_url"),
+                "confidence_tier": chunk.get("confidence_tier", 4),
+                "chunk_count": 0,
+            }
+        grouped[key]["chunk_count"] += 1
+
+    sources = sorted(grouped.values(), key=lambda s: (s["confidence_tier"], s["source_name"]))
+    return sources
 
 
 @router.get("/{investigation_id}/status")

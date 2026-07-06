@@ -76,6 +76,7 @@ export function InvestigationPage() {
               subscores={investigation.health_subscores}
             />
             <RiskAnalysisPanel
+              investigationId={id}
               riskScore={investigation.risk_score}
               riskAnalysis={investigation.risk_analysis}
             />

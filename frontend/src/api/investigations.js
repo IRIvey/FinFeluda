@@ -6,16 +6,11 @@ export async function listInvestigations() {
 }
 
 /**
- * `GET /investigations/{id}` today returns only the flat `InvestigationOut`
- * shape (id, company_name, status, health_score, risk_score, source_type,
- * created_at) — the backend hasn't wired up persistence of the nested
- * analysis result yet (company overview, yearly financials, risk
- * breakdown, executive summary, recommendations all get computed but
- * never saved). Once that lands, those keys will simply appear on this
- * same object. Every component that reads `investigation.company`,
- * `investigation.financials`, `investigation.risk_analysis`,
- * `investigation.executive_summary`, `investigation.recommendations`
- * already does so optionally, so no frontend change is required then.
+ * Returns the full analysis result once REASON has run: company,
+ * financials, risk_analysis (with red_flags), executive_summary,
+ * recommendations, health_subscores. Fields are still optional/absent
+ * for investigations that haven't finished analysis yet -- every
+ * consuming component reads them defensively.
  */
 export async function getInvestigationDetail(id) {
   const { data } = await apiClient.get(`/investigations/${id}`);
@@ -24,5 +19,12 @@ export async function getInvestigationDetail(id) {
 
 export async function getInvestigationStatus(id) {
   const { data } = await apiClient.get(`/investigations/${id}/status`);
+  return data;
+}
+
+/** Every source the GATHER stage actually fetched content from, so a
+ * user can follow the same trail the AI used. */
+export async function getInvestigationSources(id) {
+  const { data } = await apiClient.get(`/investigations/${id}/sources`);
   return data;
 }
