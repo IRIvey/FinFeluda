@@ -14,3 +14,4 @@ class Financial(Base):
     liabilities = Column(Float, nullable=True)
     cash_flow = Column(Float, nullable=True)
     debt = Column(Float, nullable=True)
+    currency = Column(String, default="USD")

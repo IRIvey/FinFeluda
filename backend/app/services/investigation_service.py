@@ -1,100 +1,74 @@
 """
-Top-level pipeline orchestrator: GATHER -> NORMALIZE -> REASON -> PERSIST.
+Shared REASON-stage runner. Both /upload (chunks already in memory
+right after NORMALIZE) and /analyze (chunks re-fetched from Qdrant for
+a standalone re-run) call this so the extract -> risk -> summarize ->
+recommend -> persist sequence and its failure handling exist in one
+place instead of two copies.
 """
+import asyncio
 import logging
-from app.sources.orchestrator import gather_all
-from app.sources.normalizer import normalize_and_store
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.investigation import Investigation, InvestigationStatus
 from app.services.reasoning_service import (
-    extract_financials, analyze_risk, generate_executive_summary, generate_recommendations,
+    extract_financials,
+    analyze_risk,
+    generate_executive_summary,
+    generate_recommendations,
 )
-from app.services.scoring_service import calculate_health_score, calculate_risk_score
+from app.services.persistence_service import persist_analysis_results, mark_investigation_failed
 
 logger = logging.getLogger(__name__)
 
 
-class PipelineResult:
-    def __init__(self):
-        self.status: str = "pending"
-        self.error: str | None = None
-        self.extraction = None
-        self.risk_analysis = None
-        self.executive_summary = None
-        self.recommendations = None
-        self.health_score: float | None = None
-        self.risk_score: float | None = None
-        self.sources_used: list[str] = []
-        self.sources_failed: list[str] = []
-
-
-async def run_pipeline(
+async def run_reason_stage(
+    db: AsyncSession,
     investigation_id: str,
     company_name: str,
-    pdf_paths: list[str] | None = None,
-    website_url: str | None = None,
-) -> PipelineResult:
-    result = PipelineResult()
+    chunks: list,
+) -> None:
+    """
+    Runs Step 7/9/10/11 of the spec's backend pipeline (structured
+    extraction, risk analysis, executive summary, recommendations) and
+    persists the result (Step 12). On any failure, marks the
+    investigation failed with the error recorded rather than leaving it
+    stuck mid-status.
+    """
+    investigation = await db.get(Investigation, investigation_id)
+    if investigation is None:
+        return
+
+    investigation.status = InvestigationStatus.analyzing
+    await db.commit()
 
     try:
-        # ---- GATHER ----
-        documents = await gather_all(company_name, pdf_paths=pdf_paths, website_url=website_url)
-        result.sources_used = [d.source_name for d in documents if d.fetch_succeeded]
-        result.sources_failed = [d.source_name for d in documents if not d.fetch_succeeded]
-
-        # ---- NORMALIZE ----
-        chunks = await normalize_and_store(investigation_id, documents)
-
         if not chunks:
-            result.status = "failed"
-            result.error = (
-                "No usable content was gathered from any source (uploaded PDFs or "
-                "public sources). Cannot run analysis on empty data."
+            await mark_investigation_failed(
+                db,
+                investigation_id,
+                "No stored source chunks found for this investigation -- "
+                "the gather step may have failed or never ran.",
             )
-            logger.error("Pipeline aborted for %s: %s", investigation_id, result.error)
-            return result
+            return
 
-        # ---- REASON ----
-        result.extraction = extract_financials(company_name, chunks)
-        result.risk_analysis = analyze_risk(company_name, result.extraction, chunks)
-        result.executive_summary = generate_executive_summary(
-            company_name, result.extraction, result.risk_analysis
+        # Groq calls are synchronous/blocking -- run off the event loop
+        # so a slow analysis doesn't stall other requests (e.g. other
+        # investigations' status polling) for the ~10-30s this takes.
+        extraction = await asyncio.to_thread(extract_financials, company_name, chunks)
+        risk = await asyncio.to_thread(analyze_risk, company_name, extraction, chunks)
+        summary = await asyncio.to_thread(
+            generate_executive_summary, company_name, extraction, risk
         )
-        result.recommendations = generate_recommendations(
-            company_name, result.extraction, result.risk_analysis
+        recommendations = await asyncio.to_thread(
+            generate_recommendations, company_name, extraction, risk
         )
 
-        # ---- SCORE ----
-        result.risk_score = result.risk_analysis.overall_risk_score
-        if result.extraction.yearly_financials:
-            latest = max(result.extraction.yearly_financials, key=lambda y: y.year)
-            result.health_score = calculate_health_score({
-                "profit_margin": _safe_margin(latest.profit, latest.revenue),
-                "debt_ratio": _safe_ratio(latest.liabilities, latest.assets),
-            })
-
-        result.status = "completed"
-        logger.info(
-            "Pipeline completed for %s (%s): %d sources used, %d failed, "
-            "health_score=%s, risk_score=%s",
-            investigation_id, company_name,
-            len(result.sources_used), len(result.sources_failed),
-            result.health_score, result.risk_score,
+        await persist_analysis_results(
+            db, investigation_id, extraction, risk, summary, recommendations
         )
+        logger.info("REASON stage completed for %s (%s)", investigation_id, company_name)
 
     except Exception as exc:
-        logger.exception("Pipeline failed for %s", investigation_id)
-        result.status = "failed"
-        result.error = str(exc)
-
-    return result
-
-
-def _safe_margin(profit, revenue) -> float | None:
-    if profit is None or not revenue:
-        return None
-    return round((profit / revenue) * 100, 2)
-
-
-def _safe_ratio(numerator, denominator) -> float | None:
-    if numerator is None or not denominator:
-        return None
-    return round(numerator / denominator, 2)
+        logger.exception("REASON stage failed for %s", investigation_id)
+        await db.rollback()
+        await mark_investigation_failed(db, investigation_id, str(exc))

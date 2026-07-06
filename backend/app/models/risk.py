@@ -1,5 +1,5 @@
 from app.core.database import Base
-from sqlalchemy import Column, String, Float, Text, ForeignKey
+from sqlalchemy import Column, String, Float, Text, Boolean, ForeignKey
 
 
 class Risk(Base):
@@ -12,3 +12,5 @@ class Risk(Base):
     severity = Column(String)
     recommendation = Column(Text)
     score = Column(Float)
+    is_contradiction = Column(Boolean, default=False)
+    supporting_sources = Column(Text, nullable=True)  # comma-joined source names

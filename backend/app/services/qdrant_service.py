@@ -58,7 +58,11 @@ else:
     client = QdrantClient(path=str(_backend_dir / "qdrant_data"))
 
 
+_index_ensured = False
+
+
 def ensure_collection():
+    global _index_ensured
     collections = [c.name for c in client.get_collections().collections]
     if settings.QDRANT_COLLECTION not in collections:
         client.create_collection(
@@ -70,6 +74,19 @@ def ensure_collection():
                 "sparse": SparseVectorParams(),
             },
         )
+
+    if not _index_ensured:
+        # Qdrant Cloud rejects FieldCondition filters (used by every
+        # investigation-scoped query below) with a 400 unless the
+        # filtered field has a payload index -- the embedded local mode
+        # is lenient about this, which is why it went unnoticed there.
+        # Idempotent: creating an index that already exists is a no-op.
+        client.create_payload_index(
+            collection_name=settings.QDRANT_COLLECTION,
+            field_name="investigation_id",
+            field_schema="keyword",
+        )
+        _index_ensured = True
 
 
 def store_normalized_chunks(

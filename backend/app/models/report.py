@@ -1,5 +1,5 @@
 from app.core.database import Base
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.sql import func
 
 
@@ -12,6 +12,7 @@ class Report(Base):
     risk_summary = Column(Text, nullable=True)
     opportunities = Column(Text, nullable=True)
     future_outlook = Column(Text, nullable=True)
-    recommendations = Column(Text, nullable=True)
+    recommendations = Column(Text, nullable=True)  # human-readable text, for the PDF/report page
+    recommendations_json = Column(JSON, nullable=True)  # [{category, recommendation, rationale}], for the dashboard panel
     pdf_url = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

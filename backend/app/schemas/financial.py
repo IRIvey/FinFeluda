@@ -11,6 +11,7 @@ class FinancialOut(BaseModel):
     liabilities: Optional[float]
     cash_flow: Optional[float]
     debt: Optional[float]
+    currency: str = "USD"
 
     class Config:
         from_attributes = True

@@ -37,11 +37,18 @@ if _resolved_url == _PLACEHOLDER_URL:
     )
     engine = create_async_engine(f"sqlite+aiosqlite:///{_BACKEND_DIR / 'dev.db'}")
 else:
+    # Supabase's pooled connection string (port 6543, PgBouncer in
+    # transaction mode) doesn't support asyncpg's server-side prepared
+    # statement cache -- reusing a statement name across pooled backend
+    # connections raises DuplicatePreparedStatementError. Disabling the
+    # cache (statement_cache_size=0) is the documented fix and is a
+    # no-op for direct (non-pooled) Postgres connections too.
     engine = create_async_engine(
         _resolved_url,
         pool_pre_ping=True,
         pool_size=5,
         max_overflow=5,
+        connect_args={"statement_cache_size": 0},
     )
 
 AsyncSessionLocal = async_sessionmaker(

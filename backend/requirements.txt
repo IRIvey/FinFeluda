@@ -39,8 +39,11 @@ pandas
 numpy
 
 # --- Report generation ---
-jinja2
-weasyprint              # HTML -> PDF (needs pango/cairo system libs)
+# reportlab builds the PDF programmatically (no HTML/CSS rendering step),
+# which avoids weasyprint's native GTK/Pango/Cairo dependency -- those
+# aren't installed on this machine and are a common pain point on
+# Windows dev machines and some deploy targets.
+reportlab
 
 # --- Storage ---
 cloudinary

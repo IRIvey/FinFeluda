@@ -25,14 +25,21 @@ logger = logging.getLogger(__name__)
 MAX_CHUNKS_PER_PROMPT = 60
 
 
-def _chunks_to_tagged_dicts(chunks: list[NormalizedChunk]) -> list[dict]:
-    sorted_chunks = sorted(chunks, key=lambda c: c.confidence_tier)
+def _field(chunk, name: str):
+    """Chunks can arrive as NormalizedChunk objects (fresh from /upload's
+    in-memory pipeline) or as plain dict payloads (fetched back from
+    Qdrant by /analyze's standalone re-run path) -- accept either."""
+    return chunk[name] if isinstance(chunk, dict) else getattr(chunk, name)
+
+
+def _chunks_to_tagged_dicts(chunks: list) -> list[dict]:
+    sorted_chunks = sorted(chunks, key=lambda c: _field(c, "confidence_tier"))
     selected = sorted_chunks[:MAX_CHUNKS_PER_PROMPT]
     return [
         {
-            "source_name": c.source_name,
-            "confidence_tier": int(c.confidence_tier),
-            "text": c.text,
+            "source_name": _field(c, "source_name"),
+            "confidence_tier": int(_field(c, "confidence_tier")),
+            "text": _field(c, "text"),
         }
         for c in selected
     ]
