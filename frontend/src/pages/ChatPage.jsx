@@ -9,7 +9,7 @@ import { useChat } from "../hooks/useChat";
 export function ChatPage() {
   const { id } = useParams();
   const { data: investigation } = useInvestigation(id);
-  const { messages, sendMessage, isSending } = useChat(id);
+  const { messages, sendMessage, isSending, isHistoryLoading } = useChat(id);
 
   return (
     <PageWrapper>
@@ -24,7 +24,7 @@ export function ChatPage() {
         <Sidebar investigationId={id} companyName={investigation?.company_name} />
 
         <div className="glass-card flex min-w-0 flex-1 flex-col" style={{ height: "65vh" }}>
-          <ChatWindow messages={messages} />
+          <ChatWindow messages={messages} isHistoryLoading={isHistoryLoading} />
           <ChatInput onSend={sendMessage} isSending={isSending} />
         </div>
       </div>
