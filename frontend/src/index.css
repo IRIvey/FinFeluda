@@ -1,0 +1,105 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+@import "./styles/globals.css";
+
+/*
+  Design system: "evidence ledger" — a light-mode due-diligence platform.
+  Every AI-derived figure in this app carries a confidence tier (how
+  trustworthy its source is). That provenance model is the visual
+  signature: tier/severity colors show up as a left-edge bar + a small
+  mono-caps pill wherever the app renders a claim, not just as data.
+*/
+@theme {
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --color-paper: #f7f7f4;
+  --color-surface: #ffffff;
+  --color-ink: #14181f;
+  --color-ink-muted: #5b6472;
+  --color-ink-faint: #93989f;
+  --color-line: #e4e3de;
+  --color-line-strong: #d3d2cb;
+
+  --color-brand: #0f6b5c;
+  --color-brand-deep: #0b4f45;
+  --color-brand-soft: #e3f0ec;
+
+  --color-tier-1: #0f6b5c;
+  --color-tier-1-soft: #e3f0ec;
+  --color-tier-2: #3e5c8a;
+  --color-tier-2-soft: #e7edf6;
+  --color-tier-3: #b8752e;
+  --color-tier-3-soft: #f6ead9;
+  --color-tier-4: #6b7078;
+  --color-tier-4-soft: #ebebe8;
+
+  --color-risk-low: #3e5c8a;
+  --color-risk-low-soft: #e7edf6;
+  --color-risk-medium: #b8752e;
+  --color-risk-medium-soft: #f6ead9;
+  --color-risk-high: #a3492a;
+  --color-risk-high-soft: #f7e6de;
+  --color-risk-critical: #a32a2a;
+  --color-risk-critical-soft: #f8e2e0;
+
+  --shadow-card: 0 1px 2px rgba(20, 24, 31, 0.04), 0 1px 8px rgba(20, 24, 31, 0.04);
+  --shadow-card-hover: 0 4px 10px rgba(20, 24, 31, 0.07), 0 2px 4px rgba(20, 24, 31, 0.05);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    background-color: var(--color-paper);
+    color: var(--color-ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .glass-card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 0.625rem;
+    box-shadow: var(--shadow-card);
+  }
+
+  .glass-panel {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: 0.875rem;
+  }
+
+  .tier-tag {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 0.125rem 0.5rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    white-space: nowrap;
+  }
+
+  .data-figure {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}

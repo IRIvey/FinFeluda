@@ -1,0 +1,49 @@
+# --- Web framework ---
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+pydantic-settings
+python-dotenv
+
+# --- Database (PostgreSQL: Supabase / Neon) ---
+sqlalchemy[asyncio]
+asyncpg
+alembic
+greenlet
+aiosqlite               # local dev/demo fallback when DATABASE_URL isn't configured
+
+# --- AI / LLM ---
+groq
+tenacity                # retry wrapper around Groq calls
+
+# --- RAG / vector store ---
+qdrant-client
+fastembed               # ONNX dense + sparse(BM25) embeddings + cross-encoder reranking, no torch
+
+# --- Document ingestion ---
+pymupdf                 # fast PDF text extraction
+pdfplumber              # table extraction from financial statements
+pytesseract             # OCR fallback for scanned PDFs (needs `tesseract-ocr` system pkg)
+pdf2image               # rasterize for OCR (needs `poppler-utils` system pkg)
+pillow
+
+# --- Website analysis ---
+httpx
+beautifulsoup4
+trafilatura             # clean main-content extraction
+lxml
+
+# --- Data / ratios ---
+pandas
+numpy
+
+# --- Report generation ---
+# reportlab builds the PDF programmatically (no HTML/CSS rendering step),
+# which avoids weasyprint's native GTK/Pango/Cairo dependency -- those
+# aren't installed on this machine and are a common pain point on
+# Windows dev machines and some deploy targets.
+reportlab
+
+# --- Storage ---
+cloudinary

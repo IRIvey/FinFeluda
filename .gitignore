@@ -1,0 +1,56 @@
+# ─────────────────────────────
+# Backend (Python / FastAPI)
+# ─────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Backend env
+backend/.env
+
+# Local dev fallback storage (used when DATABASE_URL/QDRANT_URL aren't
+# configured -- see backend/app/core/database.py and qdrant_service.py)
+dev.db
+qdrant_data/
+
+# ─────────────────────────────
+# Frontend (Node / Vite / React)
+# ─────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+
+# Frontend env
+frontend/.env
+
+# Vite / npm logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Local dev tooling config (not part of the app)
+.claude/
+
+# ─────────────────────────────
+# Editors / OS
+# ─────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.log
