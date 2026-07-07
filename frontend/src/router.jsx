@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, Outlet } from "react-router-dom";
 import { Navbar } from "./components/layout/Navbar";
+import { LandingPage } from "./pages/LandingPage";
 import { HomePage } from "./pages/HomePage";
 import { NewInvestigationPage } from "./pages/NewInvestigationPage";
 import { ProcessingPage } from "./pages/ProcessingPage";
@@ -20,10 +21,11 @@ function RootLayout() {
 }
 
 export const router = createBrowserRouter([
+  { path: "/", element: <LandingPage /> },
   {
     element: <RootLayout />,
     children: [
-      { path: "/", element: <HomePage /> },
+      { path: "/dashboard", element: <HomePage /> },
       { path: "/new", element: <NewInvestigationPage /> },
       { path: "/investigations/:id/processing", element: <ProcessingPage /> },
       { path: "/investigations/:id", element: <InvestigationPage /> },
@@ -32,7 +34,7 @@ export const router = createBrowserRouter([
       { path: "/investigations/:id/chat", element: <ChatPage /> },
       { path: "/investigations/:id/report", element: <ReportPage /> },
       { path: "/compare", element: <ComparePage /> },
-      { path: "*", element: <Navigate to="/" replace /> },
+      { path: "*", element: <Navigate to="/dashboard" replace /> },
     ],
   },
 ]);
