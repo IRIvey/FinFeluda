@@ -61,7 +61,7 @@ export function InvestigationPage() {
           </div>
           <p className="mt-1 text-sm text-ink-faint">Source: {investigation.source_type}</p>
         </div>
-        <ReportDownloadButton investigationId={id} pdfUrl={investigation.report?.pdf_url} />
+        <ReportDownloadButton investigationId={id} companyName={investigation.company_name} />
       </div>
 
       <div className="flex gap-8">

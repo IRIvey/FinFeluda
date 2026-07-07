@@ -1,41 +1,37 @@
 import { useState } from "react";
 import { Button } from "../ui/Button";
-import { downloadReportUrl } from "../../api/report";
+import { downloadReportPdf } from "../../api/report";
 
-export function ReportDownloadButton({ investigationId, pdfUrl }) {
-  const [isChecking, setIsChecking] = useState(false);
-  const [unavailable, setUnavailable] = useState(false);
+export function ReportDownloadButton({ investigationId, companyName }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
 
   const handleClick = async () => {
-    if (pdfUrl) {
-      window.open(pdfUrl, "_blank", "noopener,noreferrer");
-      return;
-    }
-    setIsChecking(true);
+    setIsDownloading(true);
+    setErrorMessage(null);
     try {
-      const data = await downloadReportUrl(investigationId);
-      if (data?.pdf_url) {
-        window.open(data.pdf_url, "_blank", "noopener,noreferrer");
-      } else {
-        setUnavailable(true);
-      }
-    } catch {
-      setUnavailable(true);
+      const blob = await downloadReportPdf(investigationId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${(companyName || "company").replace(/[^\w.-]+/g, "_")}_due_diligence_report.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setErrorMessage(err?.message || "The report couldn't be generated. Try again.");
     } finally {
-      setIsChecking(false);
+      setIsDownloading(false);
     }
   };
 
   return (
     <div className="flex flex-col items-start gap-1.5">
-      <Button variant="secondary" onClick={handleClick} isLoading={isChecking}>
+      <Button variant="secondary" onClick={handleClick} isLoading={isDownloading}>
         Download report
       </Button>
-      {unavailable && (
-        <p className="text-xs text-ink-faint">
-          The downloadable PDF isn't ready for this investigation yet.
-        </p>
-      )}
+      {errorMessage && <p className="text-xs text-risk-critical">{errorMessage}</p>}
     </div>
   );
 }

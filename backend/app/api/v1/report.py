@@ -1,11 +1,14 @@
 """
 Final due diligence report: GET returns the persisted report sections,
-GET /download generates a PDF on demand (reportlab), uploads it to
-Cloudinary, persists the resulting URL on the Report row, and returns
-it so the frontend can open it.
+GET /download generates a PDF on demand (reportlab) and streams it
+back directly. Cloudinary upload is best-effort archival only -- the
+download must never depend on it, because Cloudinary's "Restricted
+media types" account setting 401s public raw-file delivery by default.
 """
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException
+import logging
+import re
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.dependencies import get_database
@@ -18,6 +21,7 @@ from app.schemas.report import ReportOut
 from app.services.report_service import generate_pdf_report
 from app.services.cloudinary_service import upload_pdf
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -59,9 +63,6 @@ async def download_report(investigation_id: str, db: AsyncSession = Depends(get_
             status_code=400,
             detail="This investigation hasn't finished analysis yet -- nothing to generate a report from.",
         )
-
-    if report.pdf_url:
-        return {"pdf_url": report.pdf_url}
 
     company = (
         await db.execute(select(Company).where(Company.investigation_id == investigation_id))
@@ -125,11 +126,27 @@ async def download_report(investigation_id: str, db: AsyncSession = Depends(get_
     }
 
     pdf_bytes = await asyncio.to_thread(generate_pdf_report, data)
-    pdf_url = await asyncio.to_thread(
-        upload_pdf, pdf_bytes, f"{investigation_id}_report.pdf"
+
+    # Archive to Cloudinary if it works, but never let it block or
+    # break the download -- delivery of raw files 401s on accounts
+    # with the default "Restricted media types" security setting.
+    if not report.pdf_url:
+        try:
+            pdf_url = await asyncio.to_thread(
+                upload_pdf, pdf_bytes, f"{investigation_id}_report.pdf"
+            )
+            report.pdf_url = pdf_url
+            await db.commit()
+        except Exception:
+            logger.warning(
+                "Cloudinary archival upload failed for %s -- serving PDF anyway",
+                investigation_id, exc_info=True,
+            )
+
+    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", investigation.company_name or "company")
+    filename = f"{safe_name}_due_diligence_report.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
-
-    report.pdf_url = pdf_url
-    await db.commit()
-
-    return {"pdf_url": pdf_url}

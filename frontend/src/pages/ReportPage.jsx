@@ -42,7 +42,7 @@ export function ReportPage() {
             {investigation?.company_name || "This investigation"}
           </h1>
         </div>
-        <ReportDownloadButton investigationId={id} pdfUrl={report?.pdf_url} />
+        <ReportDownloadButton investigationId={id} companyName={investigation?.company_name} />
       </div>
 
       <div className="flex gap-8">
