@@ -1,15 +1,12 @@
 import { apiClient } from "../lib/axios";
 
 /**
- * Kept for parity with the backend router, but NOT called anywhere in
- * the normal upload -> processing -> dashboard flow: `/analyze/{id}`
- * requires `pdf_paths`, which are server-side temp file paths created
- * during `/upload/` and never returned to the browser. Calling this
- * from the frontend can't correctly include uploaded PDF content.
+ * Re-runs the REASON stage from the chunks already stored in Qdrant
+ * during `/upload/` — no re-upload needed. The backend allows this for
+ * gathered, completed, and failed investigations, so it's the retry
+ * path after a transient analysis failure (e.g. an LLM rate limit).
  */
-export async function triggerAnalyze(investigationId, { companyName, websiteUrl } = {}) {
-  const { data } = await apiClient.post(`/analyze/${investigationId}`, null, {
-    params: { company_name: companyName, website_url: websiteUrl },
-  });
+export async function triggerAnalyze(investigationId) {
+  const { data } = await apiClient.post(`/analyze/${investigationId}`);
   return data;
 }
