@@ -2,7 +2,7 @@ import { NavLink } from "react-router-dom";
 import { cn } from "../../lib/utils";
 
 const LINKS = [
-  { to: "/", label: "Dashboard", end: true },
+  { to: "/dashboard", label: "Dashboard", end: true },
   { to: "/new", label: "New Investigation" },
   { to: "/compare", label: "Compare" },
 ];

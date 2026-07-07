@@ -24,6 +24,13 @@ logger = logging.getLogger(__name__)
 # highest-confidence-tier chunks first if we have to truncate.
 MAX_CHUNKS_PER_PROMPT = 60
 
+# Groq's free tier enforces a 12k tokens-per-minute cap that counts
+# prompt AND max_tokens of a single request together -- a request over
+# the cap is rejected outright with a 413, it doesn't just throttle.
+# ~16k chars ≈ 4k tokens of chunk text keeps the largest prompt (risk
+# analysis: chunks + extraction dump + schema) comfortably under it.
+MAX_PROMPT_CHARS = 16000
+
 
 def _field(chunk, name: str):
     """Chunks can arrive as NormalizedChunk objects (fresh from /upload's
@@ -34,15 +41,28 @@ def _field(chunk, name: str):
 
 def _chunks_to_tagged_dicts(chunks: list) -> list[dict]:
     sorted_chunks = sorted(chunks, key=lambda c: _field(c, "confidence_tier"))
-    selected = sorted_chunks[:MAX_CHUNKS_PER_PROMPT]
-    return [
-        {
-            "source_name": _field(c, "source_name"),
-            "confidence_tier": int(_field(c, "confidence_tier")),
-            "text": _field(c, "text"),
-        }
-        for c in selected
-    ]
+
+    selected: list[dict] = []
+    total_chars = 0
+    for c in sorted_chunks[:MAX_CHUNKS_PER_PROMPT]:
+        text = _field(c, "text")
+        if selected and total_chars + len(text) > MAX_PROMPT_CHARS:
+            break
+        selected.append(
+            {
+                "source_name": _field(c, "source_name"),
+                "confidence_tier": int(_field(c, "confidence_tier")),
+                "text": text,
+            }
+        )
+        total_chars += len(text)
+
+    if len(selected) < len(chunks):
+        logger.info(
+            "Prompt budget: using %d of %d chunks (%d chars)",
+            len(selected), len(chunks), total_chars,
+        )
+    return selected
 
 
 def extract_financials(company_name: str, chunks: list[NormalizedChunk]) -> FinancialExtractionResult:
@@ -84,7 +104,7 @@ def analyze_risk(
         system="You are a skeptical due diligence analyst. Your job is to find what "
                "doesn't add up between what a company claims and what independent "
                "evidence shows. Never fabricate risks; ground every finding in the data.",
-        max_tokens=6000,
+        max_tokens=4000,
     )
 
 

@@ -32,8 +32,7 @@ from pathlib import Path
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, VectorParams, SparseVectorParams, PointStruct,
-    Filter, FieldCondition, MatchValue, NamedVector, NamedSparseVector,
-    SparseVector,
+    Filter, FieldCondition, MatchValue, SparseVector,
 )
 from app.core.config import settings
 from typing import List, Optional, TYPE_CHECKING
@@ -125,16 +124,29 @@ def _dense_search(
     limit: int,
     min_score: float,
 ) -> list:
+    """
+    Uses query_points() rather than the older search() method --
+    QdrantClient.search()/search_batch() were deprecated in favor of
+    query_points() and are gone entirely in current qdrant-client
+    versions (calling .search() now raises AttributeError). query_points
+    takes the named vector via `using=` instead of wrapping the vector
+    in NamedVector, and returns a QueryResponse whose `.points` list has
+    the same ScoredPoint shape (`.id` / `.score` / `.payload`) callers
+    here already expect.
+    """
     must_conditions = [
         FieldCondition(key="investigation_id", match=MatchValue(value=investigation_id))
     ]
-    return client.search(
+    response = client.query_points(
         collection_name=settings.QDRANT_COLLECTION,
-        query_vector=NamedVector(name="dense", vector=query_embedding),
+        query=query_embedding,
+        using="dense",
         query_filter=Filter(must=must_conditions),
         limit=limit,
         score_threshold=min_score,
+        with_payload=True,
     )
+    return response.points
 
 
 def _sparse_search(
@@ -145,18 +157,18 @@ def _sparse_search(
     must_conditions = [
         FieldCondition(key="investigation_id", match=MatchValue(value=investigation_id))
     ]
-    return client.search(
+    response = client.query_points(
         collection_name=settings.QDRANT_COLLECTION,
-        query_vector=NamedSparseVector(
-            name="sparse",
-            vector=SparseVector(indices=query_sparse["indices"], values=query_sparse["values"]),
-        ),
+        query=SparseVector(indices=query_sparse["indices"], values=query_sparse["values"]),
+        using="sparse",
         query_filter=Filter(must=must_conditions),
         limit=limit,
         # No score_threshold here -- BM25 scores aren't bounded 0-1 like
         # cosine similarity, so a fixed floor doesn't translate. Sparse
         # results are filtered downstream via RRF rank fusion instead.
+        with_payload=True,
     )
+    return response.points
 
 
 def search_hybrid(

@@ -7,3 +7,8 @@ export async function sendChatMessage({ investigationId, question }) {
   });
   return data;
 }
+
+export async function getChatHistory(investigationId) {
+  const { data } = await apiClient.get(`/chat/${investigationId}`);
+  return data;
+}

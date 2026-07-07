@@ -1,12 +1,20 @@
 import { useEffect, useRef } from "react";
 import { ChatMessage } from "./ChatMessage";
 
-export function ChatWindow({ messages }) {
+export function ChatWindow({ messages, isHistoryLoading }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
+
+  if (isHistoryLoading) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
+        <p className="text-sm text-ink-muted">Loading conversation...</p>
+      </div>
+    );
+  }
 
   if (messages.length === 0) {
     return (

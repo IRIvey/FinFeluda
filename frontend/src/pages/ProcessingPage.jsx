@@ -1,11 +1,13 @@
 import { useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageWrapper } from "../components/layout/PageWrapper";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Spinner } from "../components/ui/Spinner";
 import { Progress } from "../components/ui/Progress";
 import { usePolling } from "../hooks/usePolling";
+import { triggerAnalyze } from "../api/analyze";
 
 /**
  * `gathered` is a known dead end today: `/upload/` only runs GATHER +
@@ -28,8 +30,19 @@ const TOTAL_STEPS = STEPS.length;
 export function ProcessingPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { data, isLoading, isError, error } = usePolling(id);
   const status = data?.status;
+
+  // Restarting the poll after a retry matters: usePolling stops
+  // refetching once it sees a terminal status, so without an
+  // invalidation the page would sit on "failed" forever even though
+  // the backend is already re-analyzing.
+  const retry = useMutation({
+    mutationFn: () => triggerAnalyze(id),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["investigation-status", id] }),
+  });
 
   useEffect(() => {
     if (status === "completed") {
@@ -54,7 +67,7 @@ export function ProcessingPage() {
         <Card tier="risk-critical" className="flex flex-col items-center gap-3 py-12 text-center">
           <p className="font-display text-xl text-ink">Couldn't check on this investigation</p>
           <p className="text-sm text-ink-muted">{error?.message}</p>
-          <Button as={Link} to="/" variant="secondary" className="mt-2">
+          <Button as={Link} to="/dashboard" variant="secondary" className="mt-2">
             Back to dashboard
           </Button>
         </Card>
@@ -67,13 +80,35 @@ export function ProcessingPage() {
       <PageWrapper className="max-w-xl">
         <Card tier="risk-critical" className="flex flex-col items-center gap-3 py-12 text-center">
           <p className="font-display text-xl text-ink">This investigation failed</p>
-          <p className="max-w-sm text-sm text-ink-muted">
-            None of the sources we tried — uploaded documents or public data — produced usable
-            content. Try again with a different document or a company website.
-          </p>
-          <Button as={Link} to="/new" variant="primary" className="mt-2">
-            Start a new investigation
-          </Button>
+          {data?.error_message ? (
+            <>
+              <p className="max-w-sm text-sm text-ink-muted">
+                Analysis stopped partway through. The gathered data is still stored, so
+                retrying won't re-upload anything.
+              </p>
+              <p className="max-w-md rounded-lg bg-risk-critical-soft px-4 py-3 text-left font-mono text-xs break-words text-risk-critical">
+                {data.error_message}
+              </p>
+            </>
+          ) : (
+            <p className="max-w-sm text-sm text-ink-muted">
+              None of the sources we tried — uploaded documents or public data — produced usable
+              content. Try again with a different document or a company website.
+            </p>
+          )}
+          {retry.isError && (
+            <p className="max-w-sm text-xs text-risk-critical">
+              Retry failed: {retry.error?.response?.data?.detail || retry.error?.message}
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+            <Button onClick={() => retry.mutate()} isLoading={retry.isPending} variant="primary">
+              Retry analysis
+            </Button>
+            <Button as={Link} to="/new" variant="secondary">
+              Start a new investigation
+            </Button>
+          </div>
         </Card>
       </PageWrapper>
     );
