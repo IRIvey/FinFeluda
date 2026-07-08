@@ -30,7 +30,6 @@ from app.services.embedding_service import (
     generate_sparse_query_embedding_async,
 )
 from app.services.qdrant_service import search_hybrid_async, has_sufficient_context_async
-from app.services.reranking_service import rerank_chunks_async
 from app.services.groq_service import call_groq
 from app.prompts.comparison_chat import build_comparison_chat_prompt
 
@@ -178,10 +177,12 @@ async def answer_comparison_question(
         search_hybrid_async(dense_emb, sparse_emb, investigation_id_a, top_k=PER_SIDE_TOP_K),
         search_hybrid_async(dense_emb, sparse_emb, investigation_id_b, top_k=PER_SIDE_TOP_K),
     )
-    reranked_a, reranked_b = await asyncio.gather(
-        rerank_chunks_async(question, hybrid_a, top_n=PER_SIDE_RERANK_N),
-        rerank_chunks_async(question, hybrid_b, top_n=PER_SIDE_RERANK_N),
-    )
+    # Cross-encoder reranking disabled: running a third ONNX model
+    # alongside the dense+sparse embedders exceeded the deploy
+    # environment's memory budget. search_hybrid_async already returns
+    # results sorted by fused RRF score, so the top slice per side is
+    # still a reasonable (if less precise) ordering.
+    reranked_a, reranked_b = hybrid_a[:PER_SIDE_RERANK_N], hybrid_b[:PER_SIDE_RERANK_N]
 
     inv_a = await db.get(Investigation, investigation_id_a)
     inv_b = await db.get(Investigation, investigation_id_b)

@@ -20,8 +20,9 @@ Pipeline per question:
      so answers stay consistent with the dashboard.
   3. Embed the question (dense + sparse) with the SAME models used to
      embed stored chunks (embedding_service handles this).
-  4. Hybrid search (dense+sparse merged via RRF) -> rerank down to the
-     best few chunks (qdrant_service + reranking_service).
+  4. Hybrid search (dense+sparse merged via RRF), take the top-scoring
+     few chunks (qdrant_service). Cross-encoder reranking was dropped --
+     see the comment at its call site for why.
   5. Bail out honestly if there's neither structured context nor
      retrieved chunks -- never force an answer from nothing.
   6. Build the prompt and call Groq.
@@ -44,7 +45,6 @@ from app.services.embedding_service import (
     generate_sparse_query_embedding_async,
 )
 from app.services.qdrant_service import search_hybrid_async, has_sufficient_context_async
-from app.services.reranking_service import rerank_chunks_async
 from app.services.groq_service import call_groq
 from app.prompts.chat import build_chat_prompt
 
@@ -285,10 +285,12 @@ async def answer_question(db: AsyncSession, investigation_id: str, question: str
     hybrid_results = await search_hybrid_async(
         dense_emb, sparse_emb, investigation_id, top_k=20
     )
-    # Same context-resolution reasoning as the embedding step -- the
-    # cross-encoder also needs to know what a follow-up is really asking
-    # about, not just the bare trailing question.
-    reranked = await rerank_chunks_async(retrieval_query, hybrid_results, top_n=6)
+    # Cross-encoder reranking disabled: running a third ONNX model
+    # alongside the dense+sparse embedders exceeded the deploy
+    # environment's memory budget. search_hybrid_async already returns
+    # results sorted by fused RRF score, so the top slice is still a
+    # reasonable (if less precise) ordering.
+    reranked = hybrid_results[:6]
 
     investigation = await db.get(Investigation, investigation_id)
     company_name = (investigation.company_name if investigation else None) or "this company"
