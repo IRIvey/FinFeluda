@@ -22,6 +22,14 @@ logger = logging.getLogger(__name__)
 
 MIN_CHUNK_LENGTH = 40  # chars; shorter chunks are mostly noise
 
+# Hard ceiling on how many chunks get embedded per investigation. Without
+# this, a large gather (many sources, long documents) can produce
+# hundreds of chunks, and even at a small embedding batch_size, that's
+# still hundreds of dense+sparse embeddings computed and held in memory
+# in one request -- a real, unbounded memory cost on Render's 512MB
+# instance. Highest-confidence-tier chunks are kept first when trimming.
+MAX_CHUNKS_TO_EMBED = 150
+
 
 def normalize_documents(
     investigation_id: str,
@@ -99,6 +107,14 @@ async def normalize_and_store(
         logger.warning("No usable chunks produced for investigation %s -- "
                         "all sources failed or returned empty content", investigation_id)
         return []
+
+    if len(chunks) > MAX_CHUNKS_TO_EMBED:
+        chunks = sorted(chunks, key=lambda c: c.confidence_tier)[:MAX_CHUNKS_TO_EMBED]
+        logger.info(
+            "Trimmed to top %d highest-confidence chunks for investigation %s "
+            "(memory ceiling, not a quality choice)",
+            MAX_CHUNKS_TO_EMBED, investigation_id,
+        )
 
     texts = [c.text for c in chunks]
     dense_embeddings = await generate_embeddings_async(texts)

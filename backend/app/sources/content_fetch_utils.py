@@ -1,12 +1,14 @@
 """
 Given a URL discovered via search (Serper organic results, NewsAPI
 article links, etc.), fetch and extract its full content instead of
-settling for the ~250-char search snippet. Two extraction paths:
+settling for the ~250-char search snippet, using trafilatura (same
+tool already used for the company website crawl and Wayback Machine
+snapshots).
 
-  - PDF links: download bytes, reuse the exact same pdf_service pipeline
-    (pymupdf + OCR fallback) already used for user-uploaded PDFs.
-  - Everything else: trafilatura, same tool already used for the company
-    website crawl and Wayback Machine snapshots.
+PDF links are deliberately NOT downloaded/parsed here (see the check
+in fetch_full_content) -- confirmed the single heaviest operation in
+GATHER and a repeated OOM cause on Render's 512MB instance. They keep
+their short search snippet instead.
 
 Every failure degrades to an empty string rather than raising -- callers
 fall back to the original snippet when this comes back empty, so a
@@ -14,16 +16,12 @@ blocked/slow/broken individual link never breaks the whole fetch.
 """
 import asyncio
 import logging
-import os
-import uuid
 import httpx
 import trafilatura
-from app.services.pdf_service import save_temp_pdf, extract_text_from_pdf
 
 logger = logging.getLogger(__name__)
 
 _HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-MAX_PDF_CHARS = 6000
 MAX_PAGE_CHARS = 3000
 FETCH_TIMEOUT_SECONDS = 15.0
 
@@ -34,35 +32,25 @@ FETCH_TIMEOUT_SECONDS = 15.0
 # concurrently with each other (bounded by orchestrator.py's
 # GATHER_CONCURRENCY_LIMIT), so without a shared cap here the true
 # worst case is (outer fetcher concurrency) x (inner fetches per
-# fetcher) requests in flight at once -- including PDF downloads +
-# pymupdf parsing, which is real memory, not just network sockets.
-# This bounds the total regardless of how many fetchers are active.
+# fetcher) requests in flight at once. This bounds the total regardless
+# of how many fetchers are active.
 _FULL_CONTENT_SEMAPHORE = asyncio.Semaphore(2)
-
-
-async def _fetch_pdf(client: httpx.AsyncClient, url: str) -> str:
-    resp = await client.get(url)
-    if resp.status_code != 200:
-        return ""
-    temp_path = save_temp_pdf(resp.content, f"{uuid.uuid4()}.pdf")
-    try:
-        text = await asyncio.to_thread(extract_text_from_pdf, temp_path)
-        return (text or "")[:MAX_PDF_CHARS]
-    finally:
-        try:
-            os.remove(temp_path)
-        except OSError:
-            pass
 
 
 async def fetch_full_content(client: httpx.AsyncClient, url: str) -> str:
     """Returns extracted text, or "" on any failure/empty result."""
     if not url:
         return ""
+    if url.lower().split("?")[0].endswith(".pdf"):
+        # PDF download + pymupdf parsing disabled entirely -- confirmed
+        # the single heaviest operation in GATHER (regulatory filings
+        # like IPO prospectuses can be many pages), and the repeated
+        # cause of OOM kills on Render's 512MB instance even after
+        # every other memory fix. These links fall back to their short
+        # search snippet instead of full extracted text.
+        return ""
     async with _FULL_CONTENT_SEMAPHORE:
         try:
-            if url.lower().split("?")[0].endswith(".pdf"):
-                return await _fetch_pdf(client, url)
             resp = await client.get(url)
             if resp.status_code != 200:
                 return ""
