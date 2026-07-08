@@ -10,7 +10,6 @@ import tempfile
 import logging
 import fitz  # pymupdf
 import pdfplumber
-from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -70,16 +69,54 @@ def _extract_text_via_ocr(file_path: str) -> str:
         return ""
 
 
-def extract_tables_from_pdf(file_path: str) -> List[list]:
-    """Table extraction stays on pdfplumber -- pymupdf's table support
-    is weaker for the kind of financial statement tables this app needs."""
-    tables = []
+# extract_text_from_pdf() alone loses financial tables whenever a caller
+# truncates the flat text (see content_fetch_utils.py's MAX_PDF_CHARS) --
+# truncating from the start always keeps the cover page / AGM notice /
+# chairman's message and drops the balance sheet / income statement that
+# live 40-150 pages into a real annual report. This locates the pages
+# that actually look like financial statements first (fast pymupdf
+# keyword scan across all pages), then runs pdfplumber's much slower
+# table extraction ONLY on those specific pages -- running pdfplumber
+# over every page of a 200+ page report would be needlessly slow.
+FINANCIAL_STATEMENT_KEYWORDS = [
+    "balance sheet", "statement of financial position",
+    "profit and loss", "income statement", "statement of comprehensive income",
+    "statement of cash flows", "cash flow statement",
+    "statement of changes in equity",
+]
+MAX_FINANCIAL_TABLE_PAGES = 25
+
+
+def extract_financial_tables(file_path: str) -> str:
+    """
+    Returns financial-statement tables as readable pipe-delimited text
+    (one line per row, tables separated by blank lines), or "" if no
+    financial-statement-looking pages were found. Table extraction stays
+    on pdfplumber -- pymupdf's table support is weaker for the kind of
+    financial statement tables this app needs.
+    """
+    doc = fitz.open(file_path)
+    candidate_pages = [
+        i for i, page in enumerate(doc)
+        if any(kw in page.get_text().lower() for kw in FINANCIAL_STATEMENT_KEYWORDS)
+    ]
+    doc.close()
+
+    if not candidate_pages:
+        return ""
+    candidate_pages = candidate_pages[:MAX_FINANCIAL_TABLE_PAGES]
+
+    blocks = []
     with pdfplumber.open(file_path) as pdf:
-        for page in pdf.pages:
-            page_tables = page.extract_tables()
-            if page_tables:
-                tables.extend(page_tables)
-    return tables
+        for i in candidate_pages:
+            if i >= len(pdf.pages):
+                continue
+            for table in pdf.pages[i].extract_tables():
+                rows = [" | ".join(cell or "" for cell in row) for row in table]
+                if rows:
+                    blocks.append("\n".join(rows))
+
+    return "\n\n".join(blocks)
 
 
 # NOTE: chunking now lives in app/sources/chunking.py (chunk_text_by_boundary),

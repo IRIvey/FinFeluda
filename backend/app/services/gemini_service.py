@@ -18,6 +18,7 @@ from typing import Type, TypeVar
 import httpx
 from google import genai
 from google.genai import types
+from google.genai.errors import ServerError
 from pydantic import BaseModel
 from app.core.config import settings
 from app.services.network_retry import call_with_dns_retry
@@ -25,6 +26,14 @@ from app.services.network_retry import call_with_dns_retry
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
+
+# httpx.TransportError catches DNS/connection blips; ServerError catches
+# Gemini's own "503 UNAVAILABLE -- model currently experiencing high
+# demand, please try again later" -- confirmed in practice as a genuine,
+# textbook-transient failure distinct from a connection-level error, so
+# it gets the same retry-with-backoff treatment rather than failing the
+# whole investigation on the first hiccup.
+_RETRYABLE_GEMINI_EXCEPTIONS = (httpx.TransportError, ServerError)
 
 _client: "genai.Client | None" = None
 
@@ -60,7 +69,7 @@ def call_gemini(
             ),
         )
 
-    response = call_with_dns_retry(_do_call, exceptions=(httpx.TransportError,), label="Gemini")
+    response = call_with_dns_retry(_do_call, exceptions=_RETRYABLE_GEMINI_EXCEPTIONS, label="Gemini")
     return response.text or ""
 
 
@@ -109,7 +118,7 @@ def call_gemini_structured(
                 ),
             )
 
-        response = call_with_dns_retry(_do_call, exceptions=(httpx.TransportError,), label="Gemini")
+        response = call_with_dns_retry(_do_call, exceptions=_RETRYABLE_GEMINI_EXCEPTIONS, label="Gemini")
         truncated = bool(response.candidates) and response.candidates[0].finish_reason == "MAX_TOKENS"
 
         try:

@@ -18,12 +18,15 @@ import os
 import uuid
 import httpx
 import trafilatura
-from app.services.pdf_service import save_temp_pdf, extract_text_from_pdf
+from app.services.pdf_service import save_temp_pdf, extract_text_from_pdf, extract_financial_tables
 
 logger = logging.getLogger(__name__)
 
 _HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-MAX_PDF_CHARS = 6000
+# Raised from 6000 -- now that financial-statement tables (see
+# extract_financial_tables) are placed FIRST and are the actual valuable
+# content, truncating too aggressively would cut real numbers off again.
+MAX_PDF_CHARS = 15000
 MAX_PAGE_CHARS = 3000
 FETCH_TIMEOUT_SECONDS = 15.0
 
@@ -34,8 +37,16 @@ async def _fetch_pdf(client: httpx.AsyncClient, url: str) -> str:
         return ""
     temp_path = save_temp_pdf(resp.content, f"{uuid.uuid4()}.pdf")
     try:
-        text = await asyncio.to_thread(extract_text_from_pdf, temp_path)
-        return (text or "")[:MAX_PDF_CHARS]
+        text, tables_text = await asyncio.gather(
+            asyncio.to_thread(extract_text_from_pdf, temp_path),
+            asyncio.to_thread(extract_financial_tables, temp_path),
+        )
+        # Tables go first -- for a large annual report, the flat text's
+        # first few thousand chars are cover page/AGM notice/chairman's
+        # message, not the balance sheet, so truncation below would
+        # otherwise drop the actual financial statements every time.
+        combined = f"{tables_text}\n\n{text or ''}" if tables_text else (text or "")
+        return combined[:MAX_PDF_CHARS]
     finally:
         try:
             os.remove(temp_path)
