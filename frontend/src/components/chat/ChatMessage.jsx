@@ -39,7 +39,12 @@ export function ChatMessage({ role, content, sources, isError }) {
                   return (
                     <li key={index} className="glass-card p-3 text-xs">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium text-ink">{source.source_name}</span>
+                        <span className="font-medium text-ink">
+                          {source.company && (
+                            <span className="mr-1.5 text-ink-faint">[{source.company}]</span>
+                          )}
+                          {source.source_name}
+                        </span>
                         <Badge color={tier.color}>{tier.label}</Badge>
                       </div>
                       <p className="mt-1 text-ink-muted">{source.excerpt}</p>

@@ -6,6 +6,7 @@ import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Skeleton } from "../components/ui/Skeleton";
 import { ComparisonChart } from "../components/charts/ComparisonChart";
+import { CompareChatWidget } from "../components/compare/CompareChatWidget";
 import { useInvestigations } from "../hooks/useInvestigation";
 import { useCompare } from "../hooks/useCompare";
 import { cn, formatCurrency } from "../lib/utils";
@@ -273,6 +274,13 @@ export function ComparePage() {
           </Card>
         </div>
       )}
+
+      <CompareChatWidget
+        investigationIdA={idA}
+        investigationIdB={idB}
+        companyNameA={investigationA?.company_name}
+        companyNameB={investigationB?.company_name}
+      />
     </PageWrapper>
   );
 }

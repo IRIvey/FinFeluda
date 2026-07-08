@@ -1,7 +1,12 @@
 import { useEffect, useRef } from "react";
 import { ChatMessage } from "./ChatMessage";
 
-export function ChatWindow({ messages, isHistoryLoading }) {
+export function ChatWindow({
+  messages,
+  isHistoryLoading,
+  emptyTitle = "Ask AI about this company",
+  emptyHint = '"Why did profit decrease?", "What are the biggest risks?", "Summarize cash flow."',
+}) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -19,10 +24,8 @@ export function ChatWindow({ messages, isHistoryLoading }) {
   if (messages.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
-        <p className="font-display text-lg text-ink">Ask AI about this company</p>
-        <p className="max-w-sm text-sm text-ink-muted">
-          "Why did profit decrease?", "What are the biggest risks?", "Summarize cash flow."
-        </p>
+        <p className="font-display text-lg text-ink">{emptyTitle}</p>
+        <p className="max-w-sm text-sm text-ink-muted">{emptyHint}</p>
       </div>
     );
   }
