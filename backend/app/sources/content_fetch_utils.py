@@ -27,6 +27,18 @@ MAX_PDF_CHARS = 6000
 MAX_PAGE_CHARS = 3000
 FETCH_TIMEOUT_SECONDS = 15.0
 
+# Process-wide, not per-call: enrich_with_full_content() is invoked by 5
+# different fetchers (bd_regulatory_source.py alone accounts for
+# DSE/CSE/BSEC/BangladeshBank/MCCI), each of which can fan out up to
+# max_full_fetches concurrent requests. Those fetchers already run
+# concurrently with each other (bounded by orchestrator.py's
+# GATHER_CONCURRENCY_LIMIT), so without a shared cap here the true
+# worst case is (outer fetcher concurrency) x (inner fetches per
+# fetcher) requests in flight at once -- including PDF downloads +
+# pymupdf parsing, which is real memory, not just network sockets.
+# This bounds the total regardless of how many fetchers are active.
+_FULL_CONTENT_SEMAPHORE = asyncio.Semaphore(3)
+
 
 async def _fetch_pdf(client: httpx.AsyncClient, url: str) -> str:
     resp = await client.get(url)
@@ -47,17 +59,18 @@ async def fetch_full_content(client: httpx.AsyncClient, url: str) -> str:
     """Returns extracted text, or "" on any failure/empty result."""
     if not url:
         return ""
-    try:
-        if url.lower().split("?")[0].endswith(".pdf"):
-            return await _fetch_pdf(client, url)
-        resp = await client.get(url)
-        if resp.status_code != 200:
+    async with _FULL_CONTENT_SEMAPHORE:
+        try:
+            if url.lower().split("?")[0].endswith(".pdf"):
+                return await _fetch_pdf(client, url)
+            resp = await client.get(url)
+            if resp.status_code != 200:
+                return ""
+            text = trafilatura.extract(resp.text, include_comments=False, include_tables=False)
+            return (text or "")[:MAX_PAGE_CHARS]
+        except Exception as exc:
+            logger.warning("Full-content fetch failed for %s: %s", url, exc)
             return ""
-        text = trafilatura.extract(resp.text, include_comments=False, include_tables=False)
-        return (text or "")[:MAX_PAGE_CHARS]
-    except Exception as exc:
-        logger.warning("Full-content fetch failed for %s: %s", url, exc)
-        return ""
 
 
 async def enrich_with_full_content(
