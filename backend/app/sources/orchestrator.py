@@ -8,7 +8,6 @@ import logging
 from typing import Optional
 
 from app.schemas.source_document import SourceDocument, SourceType, ConfidenceTier
-from app.sources.wikipedia_source import WikipediaFetcher
 from app.sources.github_source import GitHubFetcher
 from app.sources.reddit_source import RedditFetcher
 from app.sources.misc_sources import NewsFetcher, GoogleMapsFetcher
@@ -27,7 +26,10 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 PUBLIC_FETCHERS = [
-    WikipediaFetcher(),
+    # WikipediaFetcher removed -- Wikipedia's API consistently returns
+    # 403 Forbidden from this deploy environment's IP (Render datacenter
+    # ranges are commonly blocked), so it never contributed usable
+    # content, only a guaranteed-failed request on every investigation.
     GitHubFetcher(),
     RedditFetcher(),
     NewsFetcher(),
