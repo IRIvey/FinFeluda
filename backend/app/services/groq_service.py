@@ -21,7 +21,7 @@ set up the fallback).
 import json
 import logging
 from typing import Type, TypeVar
-from groq import Groq, RateLimitError, APIConnectionError
+from groq import Groq, RateLimitError, APIConnectionError, InternalServerError
 from pydantic import BaseModel, ValidationError
 from app.core.config import settings
 from app.services.network_retry import call_with_dns_retry
@@ -30,6 +30,14 @@ logger = logging.getLogger(__name__)
 client = Groq(api_key=settings.GROQ_API_KEY)
 
 T = TypeVar("T", bound=BaseModel)
+
+# APIConnectionError catches DNS/connection blips; InternalServerError
+# catches Groq's own transient 5xx responses -- same reasoning as
+# gemini_service.py's ServerError retry (confirmed there in practice via
+# a real "high demand" 503). Neither is a subclass of the other, and
+# RateLimitError (429, handled separately below via the Gemini fallback)
+# is a sibling of both, not a parent, so this can't accidentally catch it.
+_RETRYABLE_GROQ_EXCEPTIONS = (APIConnectionError, InternalServerError)
 
 
 def _raw_call_groq(prompt: str, system: str, max_tokens: int, temperature: float) -> str:
@@ -53,7 +61,7 @@ def _raw_call_groq(prompt: str, system: str, max_tokens: int, temperature: float
         )
         return response.choices[0].message.content
 
-    return call_with_dns_retry(_do_call, exceptions=(APIConnectionError,), label="Groq")
+    return call_with_dns_retry(_do_call, exceptions=_RETRYABLE_GROQ_EXCEPTIONS, label="Groq")
 
 
 def call_groq(prompt: str, system: str = "You are an expert financial due diligence analyst.",

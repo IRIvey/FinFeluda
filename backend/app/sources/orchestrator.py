@@ -20,7 +20,7 @@ from app.sources.bd_regulatory_source import (
     DSEFetcher, CSEFetcher, RJSCFetcher, BSECFetcher, BangladeshBankFetcher, MCCIFetcher,
 )
 from app.sources.wayback_source import fetch_wayback_snapshots
-from app.services.pdf_service import extract_text_from_pdf
+from app.services.pdf_service import extract_text_from_pdf, extract_financial_tables
 from app.services.crawler_service import crawl_website
 from app.core.config import settings
 
@@ -50,11 +50,23 @@ async def gather_pdf_documents(pdf_paths: list[str]) -> list[SourceDocument]:
     """Extract text from each uploaded PDF -- tier 1, authoritative.
     extract_text_from_pdf does blocking file I/O + parsing (pymupdf/
     pdfplumber/OCR), so it's run in a thread to avoid stalling the
-    event loop, same as the embedding/Qdrant calls in normalizer.py."""
+    event loop, same as the embedding/Qdrant calls in normalizer.py.
+
+    Also runs extract_financial_tables() and prepends its output --
+    a large annual report's actual balance sheet/income statement live
+    deep in the document, and MAX_CHUNKS_PER_PROMPT in reasoning_service.py
+    prioritizes chunks by confidence tier, not by where they fall in the
+    original document, but putting the tables first still means they
+    survive first if anything downstream truncates by position."""
     docs = []
     for path in pdf_paths:
         try:
-            text = await asyncio.to_thread(extract_text_from_pdf, path)
+            text, tables_text = await asyncio.gather(
+                asyncio.to_thread(extract_text_from_pdf, path),
+                asyncio.to_thread(extract_financial_tables, path),
+            )
+            if tables_text:
+                text = f"--- FINANCIAL STATEMENT TABLES ---\n{tables_text}\n\n--- FULL DOCUMENT TEXT ---\n{text}"
             docs.append(SourceDocument(
                 source_type=SourceType.UPLOADED_PDF,
                 source_name=path.split("/")[-1],

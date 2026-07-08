@@ -22,7 +22,7 @@ from app.sources.orchestrator import gather_all
 from app.sources.normalizer import normalize_and_store
 from app.services.investigation_service import run_reason_stage
 from app.services.persistence_service import mark_investigation_failed
-from typing import List, Optional
+from typing import List
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -32,7 +32,7 @@ async def _run_full_pipeline(
     investigation_id: str,
     company_name: str,
     local_pdf_paths: list[str],
-    website_url: Optional[str],
+    website_url: str,
 ):
     async with AsyncSessionLocal() as db:
         investigation = await db.get(Investigation, investigation_id)
@@ -77,7 +77,13 @@ async def upload_documents(
     background_tasks: BackgroundTasks,
     company_name: str = Form(...),
     files: List[UploadFile] = File(default=[]),
-    website_url: Optional[str] = Form(None),
+    # Mandatory, not optional -- gather_all() only crawls the company
+    # website (and, critically, only discovers/fetches its linked PDFs --
+    # annual reports, investor decks) when website_url is present. Without
+    # it, a company-name-only investigation silently skips that whole
+    # path and can only pick up PDF content opportunistically, if a
+    # search result happens to link straight to one.
+    website_url: str = Form(...),
     db: AsyncSession = Depends(get_database),
 ):
     investigation_id = str(uuid.uuid4())
@@ -85,14 +91,28 @@ async def upload_documents(
 
     for f in files:
         content = await f.read()
-        # Upload to Cloudinary for permanent storage/sharing...
-        upload_pdf(content, filename=f"{investigation_id}_{f.filename}")
+        # Upload to Cloudinary for permanent storage/sharing, best-effort --
+        # never let an archival failure (e.g. the free-tier 10MB/file cap;
+        # confirmed in practice with a real 29MB annual report) crash the
+        # whole request. An unhandled exception here previously propagated
+        # past Starlette's error middleware in a way that drops CORS
+        # headers on the fallback response, which the browser then reports
+        # as a generic "Network Error" instead of the real 500/detail --
+        # same defensive pattern already used for the generated report PDF
+        # in report.py.
+        try:
+            upload_pdf(content, filename=f"{investigation_id}_{f.filename}")
+        except Exception:
+            logger.warning(
+                "Cloudinary archival upload failed for %s -- continuing without it",
+                f.filename, exc_info=True,
+            )
         # ...but also keep a local temp copy for immediate text extraction,
         # since re-downloading from Cloudinary mid-pipeline is wasted latency.
         local_path = save_temp_pdf(content, f"{investigation_id}_{f.filename}")
         local_pdf_paths.append(local_path)
 
-    source_type = "both" if (files and website_url) else ("pdf" if files else "url")
+    source_type = "both" if files else "url"
 
     investigation = Investigation(
         id=investigation_id,

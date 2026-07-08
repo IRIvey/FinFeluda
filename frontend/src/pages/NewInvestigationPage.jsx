@@ -29,11 +29,12 @@ export function NewInvestigationPage() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!companyName.trim()) return;
+    if (!companyName.trim() || !websiteUrl.trim()) return;
     mutation.mutate({ companyName: companyName.trim(), files, websiteUrl: websiteUrl.trim() });
   };
 
-  const canSubmit = companyName.trim().length > 0 && !mutation.isPending;
+  const canSubmit =
+    companyName.trim().length > 0 && websiteUrl.trim().length > 0 && !mutation.isPending;
 
   return (
     <PageWrapper className="max-w-2xl">
@@ -43,8 +44,9 @@ export function NewInvestigationPage() {
         </p>
         <h1 className="mt-1 font-display text-3xl font-semibold text-ink">Start digging</h1>
         <p className="mt-2 text-sm text-ink-muted">
-          Name the company, then give us at least one lead: a document, a website, or both. The
-          AI fills in the rest from public sources.
+          Name the company and give its official website -- the AI crawls it (and any PDFs
+          linked from it, like annual reports) automatically, then fills in the rest from
+          public sources. Add documents too if you already have them.
         </p>
       </div>
 
@@ -67,11 +69,12 @@ export function NewInvestigationPage() {
 
           <div>
             <label htmlFor="website_url" className="text-sm font-medium text-ink">
-              Website URL <span className="font-normal text-ink-faint">(optional)</span>
+              Website URL
             </label>
             <input
               id="website_url"
               type="url"
+              required
               value={websiteUrl}
               onChange={(e) => setWebsiteUrl(e.target.value)}
               placeholder="https://company.com"
