@@ -13,6 +13,7 @@ how easily Groq's free-tier daily quota gets exhausted by a single
 investigation.
 """
 import asyncio
+import gc
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -61,7 +62,9 @@ async def run_reason_stage(
         # so a slow analysis doesn't stall other requests (e.g. other
         # investigations' status polling) for the ~10-30s this takes.
         extraction = await asyncio.to_thread(extract_financials, company_name, chunks)
+        gc.collect()
         risk = await asyncio.to_thread(analyze_risk, company_name, extraction, chunks)
+        gc.collect()
         summary, recommendations = await asyncio.to_thread(
             generate_summary_and_recommendations, company_name, extraction, risk
         )

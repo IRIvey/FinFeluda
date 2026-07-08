@@ -9,6 +9,7 @@ never actually wired up by the frontend, so investigations sat at
 chunks already produced by NORMALIZE, no re-gathering or second HTTP
 call needed.
 """
+import gc
 import uuid
 import logging
 from fastapi import APIRouter, UploadFile, File, Form, Depends, BackgroundTasks
@@ -49,6 +50,14 @@ async def _run_full_pipeline(
                 website_url=website_url,
             )
             chunks = await normalize_and_store(investigation_id, documents)
+            # documents holds every source's full raw text (16 fetchers +
+            # uploaded PDFs + website crawl) -- chunks is derived from it
+            # and is all REASON needs from here on. This pipeline runs as
+            # one long-lived background task with nothing else freeing
+            # memory along the way, so drop the reference and collect
+            # explicitly rather than waiting for the whole task to finish.
+            del documents
+            gc.collect()
 
             if not chunks:
                 await mark_investigation_failed(
