@@ -22,6 +22,7 @@ CPU-bound, so calling them directly from async code blocks the event
 loop. Use the async wrappers below from any `async def`.
 """
 import asyncio
+import gc
 from fastembed import TextEmbedding, SparseTextEmbedding
 from fastembed.sparse.sparse_embedding_base import SparseEmbedding
 from typing import List
@@ -31,6 +32,14 @@ _dense_model: TextEmbedding | None = None
 _sparse_model: SparseTextEmbedding | None = None
 
 SPARSE_MODEL_NAME = "Qdrant/bm25"
+
+# fastembed's own default (256) tokenizes/runs inference on 256 chunks at
+# once. An investigation can produce hundreds of chunks across all its
+# sources (uploaded PDFs + SEC/Wikipedia/GitHub/news/etc.), so embedding
+# them all in one default-sized batch is a second, independent memory
+# spike on top of the model-loading one -- this caps it regardless of
+# how large a given investigation's chunk set is.
+EMBED_BATCH_SIZE = 8
 
 
 def get_model() -> TextEmbedding:
@@ -58,7 +67,9 @@ def get_sparse_model() -> SparseTextEmbedding:
 def generate_embeddings(texts: List[str]) -> List[List[float]]:
     """Sync dense embedding. Call generate_embeddings_async() from async code."""
     model = get_model()
-    return [vec.tolist() for vec in model.embed(texts)]
+    result = [vec.tolist() for vec in model.embed(texts, batch_size=EMBED_BATCH_SIZE)]
+    gc.collect()
+    return result
 
 
 def generate_query_embedding(query: str) -> List[float]:
@@ -74,11 +85,13 @@ def generate_sparse_embeddings(texts: List[str]) -> List[dict]:
     Call generate_sparse_embeddings_async() from async code.
     """
     model = get_sparse_model()
-    results: List[SparseEmbedding] = list(model.embed(texts))
-    return [
+    results: List[SparseEmbedding] = list(model.embed(texts, batch_size=EMBED_BATCH_SIZE))
+    output = [
         {"indices": r.indices.tolist(), "values": r.values.tolist()}
         for r in results
     ]
+    gc.collect()
+    return output
 
 
 def generate_sparse_query_embedding(query: str) -> dict:
