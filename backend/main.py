@@ -61,26 +61,28 @@ def _add_missing_columns(sync_conn):
 
 def _preload_rag_models():
     """
-    Loads the dense/sparse embedding models and the reranker once, at
-    boot, instead of lazily on the first chat request. Two reasons:
-    1. If the instance's memory is too tight for all three models
-       (as on Render's 512MB free tier), it fails loudly at deploy
-       time instead of crashing mid-request for whichever user
-       happens to try chat first.
-    2. Chat's first real question doesn't pay the multi-second
-       "downloading model files" cold-start cost.
+    Loads the dense/sparse embedding models once, at boot, instead of
+    lazily on the first request that needs them (upload's NORMALIZE
+    stage, or chat). If the instance's memory is too tight for these,
+    it fails loudly at deploy time instead of crashing mid-request for
+    whichever user happens to trigger it first.
+
+    The reranker (chat_service/comparison_chat_service's cross-encoder)
+    is deliberately NOT preloaded here -- on Render's 512MB free tier,
+    eagerly loading all three ONNX models at once left too little
+    headroom and caused boot-time OOM kills. It stays lazily loaded on
+    first chat use instead, same as before this preload step existed.
+
     gc.collect() after loading drops the transient download buffers
     that huggingface_hub/onnxruntime allocate while unpacking model
     files, which otherwise linger as peak (not steady-state) memory.
     """
     from app.services.embedding_service import get_model, get_sparse_model
-    from app.services.reranking_service import get_reranker
 
     get_model()
     get_sparse_model()
-    get_reranker()
     gc.collect()
-    logger.info("RAG models (dense, sparse, reranker) preloaded at startup")
+    logger.info("RAG embedding models (dense, sparse) preloaded at startup")
 
 
 @app.on_event("startup")
