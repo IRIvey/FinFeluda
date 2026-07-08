@@ -100,7 +100,7 @@ async def gather_website_document(website_url: str) -> SourceDocument:
         )
 
 
-GATHER_CONCURRENCY_LIMIT = 4
+GATHER_CONCURRENCY_LIMIT = 2
 
 
 async def gather_public_sources(company_name: str) -> list[SourceDocument]:

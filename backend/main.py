@@ -73,28 +73,26 @@ def _preload_rag_models():
     headroom and caused boot-time OOM kills. It stays lazily loaded on
     first chat use instead, same as before this preload step existed.
 
-    Also imports gemini_service here. It's normally only imported the
-    first time groq_service.py catches a RateLimitError (Groq's
-    free-tier daily quota is small enough that a single investigation's
-    REASON stage exhausts it routinely, so this fallback is really not
-    optional in practice). `from google import genai` pulls in grpcio,
-    protobuf, google-auth, and cryptography -- none of which are
-    otherwise loaded -- so paying that import cost as a surprise mid-
-    request, on top of an already near-full memory budget, was a
-    repeat OOM trigger. Importing it here instead means that cost is
-    paid once, predictably, at boot alongside the embedding models.
+    gemini_service is ALSO deliberately not preloaded, despite an
+    earlier attempt to do so here -- reverted. `from google import
+    genai` pulls in grpcio/protobuf/google-auth/cryptography (~346
+    modules), and preloading it raised the permanent baseline enough
+    that GATHER -- which runs unconditionally on every single upload --
+    started failing far more often than the conditional, less-frequent
+    Gemini-fallback crash it was meant to fix. GATHER's memory need
+    matters more since it's on every request path, not just the ones
+    where Groq's quota gets exhausted. Stays lazy; see groq_service.py.
 
     gc.collect() after loading drops the transient download buffers
     that huggingface_hub/onnxruntime allocate while unpacking model
     files, which otherwise linger as peak (not steady-state) memory.
     """
     from app.services.embedding_service import get_model, get_sparse_model
-    import app.services.gemini_service  # noqa: F401 -- import side effect only, see above
 
     get_model()
     get_sparse_model()
     gc.collect()
-    logger.info("RAG embedding models (dense, sparse) + Gemini SDK preloaded at startup")
+    logger.info("RAG embedding models (dense, sparse) preloaded at startup")
 
 
 @app.on_event("startup")

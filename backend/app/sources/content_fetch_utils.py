@@ -37,7 +37,7 @@ FETCH_TIMEOUT_SECONDS = 15.0
 # fetcher) requests in flight at once -- including PDF downloads +
 # pymupdf parsing, which is real memory, not just network sockets.
 # This bounds the total regardless of how many fetchers are active.
-_FULL_CONTENT_SEMAPHORE = asyncio.Semaphore(3)
+_FULL_CONTENT_SEMAPHORE = asyncio.Semaphore(2)
 
 
 async def _fetch_pdf(client: httpx.AsyncClient, url: str) -> str:
