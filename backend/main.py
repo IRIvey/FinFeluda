@@ -7,6 +7,8 @@ truststore.inject_into_ssl()
 # cert chain that certifi can't complete but the OS trust store can
 # (via AIA chasing), without disabling verification.
 
+import asyncio
+import gc
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -57,11 +59,36 @@ def _add_missing_columns(sync_conn):
             logger.info("Added missing column %s.%s", table.name, column.name)
 
 
+def _preload_rag_models():
+    """
+    Loads the dense/sparse embedding models and the reranker once, at
+    boot, instead of lazily on the first chat request. Two reasons:
+    1. If the instance's memory is too tight for all three models
+       (as on Render's 512MB free tier), it fails loudly at deploy
+       time instead of crashing mid-request for whichever user
+       happens to try chat first.
+    2. Chat's first real question doesn't pay the multi-second
+       "downloading model files" cold-start cost.
+    gc.collect() after loading drops the transient download buffers
+    that huggingface_hub/onnxruntime allocate while unpacking model
+    files, which otherwise linger as peak (not steady-state) memory.
+    """
+    from app.services.embedding_service import get_model, get_sparse_model
+    from app.services.reranking_service import get_reranker
+
+    get_model()
+    get_sparse_model()
+    get_reranker()
+    gc.collect()
+    logger.info("RAG models (dense, sparse, reranker) preloaded at startup")
+
+
 @app.on_event("startup")
 async def create_tables():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_add_missing_columns)
+    await asyncio.to_thread(_preload_rag_models)
 
 
 @app.get("/health")

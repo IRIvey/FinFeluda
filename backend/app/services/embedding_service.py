@@ -36,14 +36,22 @@ SPARSE_MODEL_NAME = "Qdrant/bm25"
 def get_model() -> TextEmbedding:
     global _dense_model
     if _dense_model is None:
-        _dense_model = TextEmbedding(model_name=settings.EMBEDDING_MODEL)
+        # threads=1 + CPU-only provider: keeps onnxruntime's per-session
+        # memory arena small, which matters on memory-capped free-tier
+        # deploys (Render's 512MB) running dense+sparse+reranker models
+        # in the same process.
+        _dense_model = TextEmbedding(
+            model_name=settings.EMBEDDING_MODEL, threads=1, providers=["CPUExecutionProvider"]
+        )
     return _dense_model
 
 
 def get_sparse_model() -> SparseTextEmbedding:
     global _sparse_model
     if _sparse_model is None:
-        _sparse_model = SparseTextEmbedding(model_name=SPARSE_MODEL_NAME)
+        _sparse_model = SparseTextEmbedding(
+            model_name=SPARSE_MODEL_NAME, threads=1, providers=["CPUExecutionProvider"]
+        )
     return _sparse_model
 
 

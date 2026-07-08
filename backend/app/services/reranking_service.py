@@ -34,7 +34,13 @@ RERANKER_MODEL_NAME = "Xenova/ms-marco-MiniLM-L-6-v2"  # small, fast, good defau
 def get_reranker() -> TextCrossEncoder:
     global _reranker
     if _reranker is None:
-        _reranker = TextCrossEncoder(model_name=RERANKER_MODEL_NAME)
+        # threads=1 + CPU-only provider: keeps onnxruntime's per-session
+        # memory arena small -- this runs alongside the dense/sparse
+        # embedding models in the same memory-capped process (see
+        # embedding_service.py for the matching rationale).
+        _reranker = TextCrossEncoder(
+            model_name=RERANKER_MODEL_NAME, threads=1, providers=["CPUExecutionProvider"]
+        )
     return _reranker
 
 
