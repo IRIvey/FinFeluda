@@ -1,5 +1,6 @@
 import { Card } from "../ui/Card";
 import { EmptyState } from "../ui/EmptyState";
+import { ScoreRing } from "../charts/ScoreRing";
 import { SubscoreBarChart } from "../charts/SubscoreBarChart";
 import { scoreTone } from "../../lib/utils";
 
@@ -10,28 +11,25 @@ export function HealthScoreCard({ healthScore, subscores }) {
 
   return (
     <Card title="Financial health score" tier={tone}>
-      <div className="flex items-baseline gap-2">
-        <span className="data-figure text-5xl font-semibold" style={{ color: `var(--color-${tone})` }}>
-          {healthScore ?? "—"}
-        </span>
-        <span className="text-sm text-ink-faint">/ 100</span>
-      </div>
-
-      <div className="mt-5">
-        {subscores ? (
-          <SubscoreBarChart
-            data={SUBSCORE_LABELS.filter((key) => subscores[key] !== undefined).map((key) => ({
-              label: key.charAt(0).toUpperCase() + key.slice(1),
-              value: subscores[key],
-              tone: scoreTone(subscores[key]),
-            }))}
-          />
-        ) : (
-          <EmptyState>
-            Growth, liquidity, profitability, debt, and efficiency sub-scores aren't broken out for
-            this investigation yet.
-          </EmptyState>
-        )}
+      <div className="flex items-center gap-4">
+        <ScoreRing value={healthScore} tone={tone} label="/ 100" />
+        <div className="min-w-0 flex-1">
+          {subscores ? (
+            <SubscoreBarChart
+              height={150}
+              data={SUBSCORE_LABELS.filter((key) => subscores[key] !== undefined).map((key) => ({
+                label: key.charAt(0).toUpperCase() + key.slice(1),
+                value: subscores[key],
+                tone: scoreTone(subscores[key]),
+              }))}
+            />
+          ) : (
+            <EmptyState>
+              Growth, liquidity, profitability, debt, and efficiency sub-scores aren't broken out
+              for this investigation yet.
+            </EmptyState>
+          )}
+        </div>
       </div>
     </Card>
   );

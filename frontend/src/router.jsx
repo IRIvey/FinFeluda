@@ -10,6 +10,9 @@ import { ReportPage } from "./pages/ReportPage";
 import { ComparePage } from "./pages/ComparePage";
 import { SourcesPage } from "./pages/SourcesPage";
 import { RiskCategoryPage } from "./pages/RiskCategoryPage";
+import { RedFlagsPage } from "./pages/RedFlagsPage";
+import { ExecutiveSummaryPage } from "./pages/ExecutiveSummaryPage";
+import { RecommendationsPage } from "./pages/RecommendationsPage";
 
 function RootLayout() {
   return (
@@ -31,6 +34,9 @@ export const router = createBrowserRouter([
       { path: "/investigations/:id", element: <InvestigationPage /> },
       { path: "/investigations/:id/sources", element: <SourcesPage /> },
       { path: "/investigations/:id/risks/:category", element: <RiskCategoryPage /> },
+      { path: "/investigations/:id/red-flags", element: <RedFlagsPage /> },
+      { path: "/investigations/:id/summary", element: <ExecutiveSummaryPage /> },
+      { path: "/investigations/:id/recommendations", element: <RecommendationsPage /> },
       { path: "/investigations/:id/chat", element: <ChatPage /> },
       { path: "/investigations/:id/report", element: <ReportPage /> },
       { path: "/compare", element: <ComparePage /> },

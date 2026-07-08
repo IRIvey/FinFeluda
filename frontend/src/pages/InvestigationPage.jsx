@@ -8,9 +8,6 @@ import { CompanyOverview } from "../components/investigation/CompanyOverview";
 import { FinancialDashboard } from "../components/investigation/FinancialDashboard";
 import { HealthScoreCard } from "../components/investigation/HealthScoreCard";
 import { RiskAnalysisPanel } from "../components/investigation/RiskAnalysisPanel";
-import { RedFlagSection } from "../components/investigation/RedFlagSection";
-import { ExecutiveSummary } from "../components/investigation/ExecutiveSummary";
-import { RecommendationsPanel } from "../components/investigation/RecommendationsPanel";
 import { CompanyTimeline } from "../components/investigation/CompanyTimeline";
 import { ReportDownloadButton } from "../components/investigation/ReportDownloadButton";
 import { useInvestigation } from "../hooks/useInvestigation";
@@ -83,9 +80,6 @@ export function InvestigationPage() {
           </div>
 
           <FinancialDashboard financials={investigation.financials} />
-          <RedFlagSection redFlags={investigation.risk_analysis?.red_flags} />
-          <ExecutiveSummary summary={investigation.executive_summary} />
-          <RecommendationsPanel recommendations={investigation.recommendations} />
           <CompanyTimeline financials={investigation.financials} />
         </div>
       </div>

@@ -215,16 +215,9 @@ function SummaryGhost() {
         expanding storage product line and a positive investor narrative heading into
         FY2025.
       </p>
-      <p className="mt-3 text-sm leading-relaxed text-ink-muted">
-        The business has scaled its go-to-market team and continues to sign new utility
-        partnerships, with leadership pointing to a strong pipeline for the year ahead.
-      </p>
-      <p className="mt-3 text-sm leading-relaxed text-ink-muted">
-        Overall trajectory looks positive, and management sounds confident about
-        FY2025 in every public appearance so far.
-      </p>
       <p className="mt-3 text-sm leading-relaxed text-ink-faint italic">
-        No specific concerns are flagged in this overview.
+        Management sounds confident about the year ahead. No specific concerns are
+        flagged in this overview.
       </p>
     </ReportShell>
   );
@@ -248,12 +241,6 @@ function Evidence({ tier, children }) {
     </span>
   );
 }
-
-const KEY_FIGURES = [
-  { label: "Revenue", value: "$55.3M" },
-  { label: "Debt", value: "$24M" },
-  { label: "Cash flow", value: "$2.4M" },
-];
 
 const SCORE_BARS = [
   { label: "Health", value: 62, tone: "tier-3" },
@@ -301,42 +288,22 @@ function ReportDetail() {
 
       <p className="mt-3 text-sm leading-relaxed text-ink">
         Revenue grew <Evidence tier={1}>34% YoY in FY2024</Evidence>, partly funded by{" "}
-        <Evidence tier={1}>$18M in acquisition debt taken on in 2023</Evidence>. Operating
-        margin compressed to <Evidence tier={1}>6% as service costs outpaced hardware sales</Evidence>,
-        leaving roughly <Evidence tier={1}>five months of runway</Evidence> at the current burn rate.
+        <Evidence tier={1}>$18M in acquisition debt taken on in 2023</Evidence>. Independent
+        coverage flags <Evidence tier={3}>rising employee turnover since 2023</Evidence>, and
+        the founder's claim of being <Evidence tier={4}>"the category leader"</Evidence>{" "}
+        contradicts independent market-share data.
       </p>
-
-      <p className="mt-3 text-sm leading-relaxed text-ink">
-        Independent coverage flags <Evidence tier={3}>rising employee turnover since 2023</Evidence>{" "}
-        and <Evidence tier={3}>customer concentration — the top three utility contracts are 41%
-        of revenue</Evidence>. The founder's claim of being{" "}
-        <Evidence tier={4}>"the category leader"</Evidence> contradicts independent
-        market-share data.
-      </p>
-
-      <div className="mt-4 grid grid-cols-3 gap-3 border-t border-line pt-3 text-center">
-        {KEY_FIGURES.map((f) => (
-          <div key={f.label}>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">{f.label}</p>
-            <p className="data-figure text-sm font-semibold text-ink">{f.value}</p>
-          </div>
-        ))}
-      </div>
 
       <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-risk-high">
         <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-risk-high" />
         3 red flags identified — 1 is a contradiction
-      </p>
-      <p className="mt-2 text-xs text-ink-faint">
-        Sourced from the SEC 10-K, the company site, 6 independent articles, and
-        employee reviews — 14 sources checked in total.
       </p>
     </ReportShell>
   );
 }
 
 const LENS_RADIUS = 68;
-const MAGNIFICATION = 1.4;
+const MAGNIFICATION = 1.1;
 
 /* glass.png is a 512x512 outline icon; the see-through hole isn't
    centered on the canvas (there's a handle reaching toward the

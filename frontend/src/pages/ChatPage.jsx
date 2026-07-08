@@ -21,7 +21,7 @@ export function ChatPage() {
       </div>
 
       <div className="flex gap-8">
-        <Sidebar investigationId={id} companyName={investigation?.company_name} />
+        <Sidebar investigationId={id} companyName={investigation?.company_name} hideChatButton />
 
         <div className="glass-card flex min-w-0 flex-1 flex-col" style={{ height: "65vh" }}>
           <ChatWindow messages={messages} isHistoryLoading={isHistoryLoading} />
