@@ -98,11 +98,20 @@ async def gather_website_document(website_url: str) -> SourceDocument:
         )
 
 
+GATHER_CONCURRENCY_LIMIT = 4
+
+
 async def gather_public_sources(company_name: str) -> list[SourceDocument]:
     """
-    Fan out to every public fetcher concurrently. asyncio.gather with
-    return_exceptions=True is a second safety net on top of each
-    fetcher's own try/catch.
+    Fan out to every public fetcher, capped at GATHER_CONCURRENCY_LIMIT
+    running at once (via semaphore) rather than all of them at the same
+    time. All ~16 fetchers still run and every source still gets
+    gathered -- this only spreads their HTTP fetch + HTML/JSON parsing
+    over a few waves instead of one single burst, which matters on a
+    memory-capped deploy (Render's 512MB) where 16 concurrent response
+    bodies + parsed documents in memory at once was a real spike.
+    asyncio.gather with return_exceptions=True is a second safety net
+    on top of each fetcher's own try/catch.
     """
     api_keys = {
         "github_token": settings.GITHUB_TOKEN,
@@ -114,7 +123,13 @@ async def gather_public_sources(company_name: str) -> list[SourceDocument]:
         "serper_api_key": settings.SERPER_API_KEY,
     }
 
-    tasks = [fetcher.fetch(company_name, **api_keys) for fetcher in PUBLIC_FETCHERS]
+    semaphore = asyncio.Semaphore(GATHER_CONCURRENCY_LIMIT)
+
+    async def _bounded_fetch(fetcher):
+        async with semaphore:
+            return await fetcher.fetch(company_name, **api_keys)
+
+    tasks = [_bounded_fetch(fetcher) for fetcher in PUBLIC_FETCHERS]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     docs: list[SourceDocument] = []
