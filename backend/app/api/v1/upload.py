@@ -23,6 +23,7 @@ from app.sources.orchestrator import gather_all
 from app.sources.normalizer import normalize_and_store
 from app.services.investigation_service import run_reason_stage
 from app.services.persistence_service import mark_investigation_failed
+from app.core.memory_debug import log_memory
 from typing import List, Optional
 
 logger = logging.getLogger(__name__)
@@ -44,12 +45,15 @@ async def _run_full_pipeline(
         await db.commit()
 
         try:
+            log_memory(f"{investigation_id} before GATHER")
             documents = await gather_all(
                 company_name=company_name,
                 pdf_paths=local_pdf_paths,
                 website_url=website_url,
             )
+            log_memory(f"{investigation_id} after GATHER ({len(documents)} docs)")
             chunks = await normalize_and_store(investigation_id, documents)
+            log_memory(f"{investigation_id} after NORMALIZE ({len(chunks)} chunks)")
             # documents holds every source's full raw text (16 fetchers +
             # uploaded PDFs + website crawl) -- chunks is derived from it
             # and is all REASON needs from here on. This pipeline runs as

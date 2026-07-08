@@ -88,11 +88,13 @@ def _preload_rag_models():
     files, which otherwise linger as peak (not steady-state) memory.
     """
     from app.services.embedding_service import get_model, get_sparse_model
+    from app.core.memory_debug import log_memory
 
     get_model()
     get_sparse_model()
     gc.collect()
     logger.info("RAG embedding models (dense, sparse) preloaded at startup")
+    log_memory("baseline after startup preload")
 
 
 @app.on_event("startup")

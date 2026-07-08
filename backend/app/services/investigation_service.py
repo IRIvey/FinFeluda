@@ -24,6 +24,7 @@ from app.services.reasoning_service import (
     generate_summary_and_recommendations,
 )
 from app.services.persistence_service import persist_analysis_results, mark_investigation_failed
+from app.core.memory_debug import log_memory
 
 logger = logging.getLogger(__name__)
 
@@ -61,13 +62,17 @@ async def run_reason_stage(
         # Groq calls are synchronous/blocking -- run off the event loop
         # so a slow analysis doesn't stall other requests (e.g. other
         # investigations' status polling) for the ~10-30s this takes.
+        log_memory(f"{investigation_id} before extract_financials")
         extraction = await asyncio.to_thread(extract_financials, company_name, chunks)
         gc.collect()
+        log_memory(f"{investigation_id} after extract_financials")
         risk = await asyncio.to_thread(analyze_risk, company_name, extraction, chunks)
         gc.collect()
+        log_memory(f"{investigation_id} after analyze_risk")
         summary, recommendations = await asyncio.to_thread(
             generate_summary_and_recommendations, company_name, extraction, risk
         )
+        log_memory(f"{investigation_id} after generate_summary_and_recommendations")
 
         await persist_analysis_results(
             db, investigation_id, extraction, risk, summary, recommendations
