@@ -1,9 +1,16 @@
 """
 Shared REASON-stage runner. Both /upload (chunks already in memory
 right after NORMALIZE) and /analyze (chunks re-fetched from Qdrant for
-a standalone re-run) call this so the extract -> risk -> summarize ->
+a standalone re-run) call this so the extract -> risk -> summarize+
 recommend -> persist sequence and its failure handling exist in one
-place instead of two copies.
+place instead of two copies. Three sequential Groq calls -- summary and
+recommendations used to be separate calls despite depending on
+identical inputs (extraction + risk, never raw chunks), so they're
+merged into one (see
+reasoning_service.generate_summary_and_recommendations), and review
+extraction was dropped entirely, purely to cut request overhead given
+how easily Groq's free-tier daily quota gets exhausted by a single
+investigation.
 """
 import asyncio
 import logging
@@ -13,8 +20,7 @@ from app.models.investigation import Investigation, InvestigationStatus
 from app.services.reasoning_service import (
     extract_financials,
     analyze_risk,
-    generate_executive_summary,
-    generate_recommendations,
+    generate_summary_and_recommendations,
 )
 from app.services.persistence_service import persist_analysis_results, mark_investigation_failed
 
@@ -56,11 +62,8 @@ async def run_reason_stage(
         # investigations' status polling) for the ~10-30s this takes.
         extraction = await asyncio.to_thread(extract_financials, company_name, chunks)
         risk = await asyncio.to_thread(analyze_risk, company_name, extraction, chunks)
-        summary = await asyncio.to_thread(
-            generate_executive_summary, company_name, extraction, risk
-        )
-        recommendations = await asyncio.to_thread(
-            generate_recommendations, company_name, extraction, risk
+        summary, recommendations = await asyncio.to_thread(
+            generate_summary_and_recommendations, company_name, extraction, risk
         )
 
         await persist_analysis_results(

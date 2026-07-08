@@ -18,13 +18,20 @@ import hashlib
 class SourceType(str, Enum):
     # Tier 1 — authoritative, user-provided or official filings
     UPLOADED_PDF = "uploaded_pdf"
-    SEC_FILING = "sec_filing"
+
+    # Tier 1 — Bangladesh regulatory/exchange
+    DSE_FILING = "dse_filing"
+    CSE_FILING = "cse_filing"
+    RJSC_RECORD = "rjsc_record"        # stubbed -- see bd_regulatory_source.py
+    BSEC_FILING = "bsec_filing"
+    BANGLADESH_BANK = "bangladesh_bank"
 
     # Tier 2 — official but third-party-published
     COMPANY_WEBSITE = "company_website"
     WIKIPEDIA = "wikipedia"
     GITHUB = "github"
     GOOGLE_MAPS = "google_maps"
+    JOB_LISTING = "job_listing"
 
     # Tier 3 — public sentiment / unverified signal
     NEWS_ARTICLE = "news_article"
@@ -34,6 +41,8 @@ class SourceType(str, Enum):
     PRODUCT_HUNT = "product_hunt"
     APP_STORE = "app_store"
     GLASSDOOR = "glassdoor"
+    WEB_ARCHIVE = "web_archive"
+    CHAMBER_DIRECTORY = "chamber_directory"
 
 
 class ConfidenceTier(int, Enum):
@@ -51,13 +60,20 @@ class ConfidenceTier(int, Enum):
 
 SOURCE_TIER_MAP: dict[SourceType, ConfidenceTier] = {
     SourceType.UPLOADED_PDF: ConfidenceTier.AUTHORITATIVE,
-    SourceType.SEC_FILING: ConfidenceTier.AUTHORITATIVE,
+    SourceType.DSE_FILING: ConfidenceTier.AUTHORITATIVE,
+    SourceType.CSE_FILING: ConfidenceTier.AUTHORITATIVE,
+    SourceType.RJSC_RECORD: ConfidenceTier.AUTHORITATIVE,
+    SourceType.BSEC_FILING: ConfidenceTier.AUTHORITATIVE,
+    SourceType.BANGLADESH_BANK: ConfidenceTier.AUTHORITATIVE,
     SourceType.COMPANY_WEBSITE: ConfidenceTier.OFFICIAL,
     SourceType.GITHUB: ConfidenceTier.OFFICIAL,
     SourceType.GOOGLE_MAPS: ConfidenceTier.OFFICIAL,
+    SourceType.JOB_LISTING: ConfidenceTier.OFFICIAL,
     SourceType.WIKIPEDIA: ConfidenceTier.CORROBORATING,
     SourceType.NEWS_ARTICLE: ConfidenceTier.CORROBORATING,
     SourceType.GOOGLE_SEARCH: ConfidenceTier.CORROBORATING,
+    SourceType.WEB_ARCHIVE: ConfidenceTier.CORROBORATING,
+    SourceType.CHAMBER_DIRECTORY: ConfidenceTier.CORROBORATING,
     SourceType.REDDIT: ConfidenceTier.UNVERIFIED_SIGNAL,
     SourceType.YOUTUBE: ConfidenceTier.UNVERIFIED_SIGNAL,
     SourceType.PRODUCT_HUNT: ConfidenceTier.UNVERIFIED_SIGNAL,

@@ -30,17 +30,19 @@ import logging
 from collections import defaultdict
 from pathlib import Path
 from qdrant_client import QdrantClient
+from qdrant_client.http.exceptions import ResponseHandlingException
 from qdrant_client.models import (
     Distance, VectorParams, SparseVectorParams, PointStruct,
     Filter, FieldCondition, MatchValue, SparseVector,
 )
 from app.core.config import settings
+from app.services.network_retry import call_with_dns_retry
 from typing import List, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.schemas.source_document import NormalizedChunk
 
-EMBEDDING_DIM = 384  # BAAI/bge-small-en-v1.5 dense output size
+EMBEDDING_DIM = 384  # paraphrase-multilingual-MiniLM-L12-v2 dense output size
 
 if settings.QDRANT_URL:
     client = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
@@ -305,6 +307,18 @@ def get_all_chunks_for_investigation(investigation_id: str, limit: int = 500) ->
     return payloads
 
 
+def delete_chunks_for_investigation(investigation_id: str) -> None:
+    """Sync implementation. Call delete_chunks_for_investigation_async()
+    from async code (e.g. the investigation DELETE endpoint)."""
+    ensure_collection()
+    client.delete(
+        collection_name=settings.QDRANT_COLLECTION,
+        points_selector=Filter(must=[
+            FieldCondition(key="investigation_id", match=MatchValue(value=investigation_id))
+        ]),
+    )
+
+
 def get_tier_coverage_summary(investigation_id: str) -> dict:
     """
     Structural metadata about what confidence tiers actually have data
@@ -344,13 +358,33 @@ def get_tier_coverage_summary(investigation_id: str) -> dict:
 
 
 # --- Async wrappers -- use these from any `async def` code ---
+#
+# Every wrapper below routes through _run_with_retry() rather than calling
+# asyncio.to_thread() on the sync function directly -- Qdrant Cloud calls
+# hit the exact same transient-connection-failure class as Groq/Gemini
+# (confirmed in practice: a TLS handshake timeout on a mobile data
+# connection killed the GATHER stage's ensure_collection() call). Every
+# sync function above funnels through the shared `client`, and
+# qdrant-client wraps any transport-level failure (DNS, TLS timeout, etc.)
+# in the same ResponseHandlingException regardless of cause, so one catch
+# here covers all of them -- it does NOT wrap genuine HTTP error
+# responses (those raise UnexpectedResponse instead), so this never masks
+# a real API error behind pointless retries.
+
+def _run_with_retry(fn, *args):
+    return call_with_dns_retry(
+        lambda: fn(*args), exceptions=(ResponseHandlingException,), label="Qdrant"
+    )
+
 
 async def store_chunks_async(
     chunks: List["NormalizedChunk"],
     dense_embeddings: List[List[float]],
     sparse_embeddings: List[dict],
 ) -> None:
-    await asyncio.to_thread(store_normalized_chunks, chunks, dense_embeddings, sparse_embeddings)
+    await asyncio.to_thread(
+        _run_with_retry, store_normalized_chunks, chunks, dense_embeddings, sparse_embeddings
+    )
 
 
 async def search_hybrid_async(
@@ -363,8 +397,8 @@ async def search_hybrid_async(
     rrf_k: int = 60,
 ) -> List[dict]:
     return await asyncio.to_thread(
-        search_hybrid, dense_query_embedding, sparse_query_embedding, investigation_id,
-        top_k, max_confidence_tier, min_score, rrf_k,
+        _run_with_retry, search_hybrid, dense_query_embedding, sparse_query_embedding,
+        investigation_id, top_k, max_confidence_tier, min_score, rrf_k,
     )
 
 
@@ -376,7 +410,8 @@ async def search_similar_async(
     min_score: float = 0.35,
 ) -> List[dict]:
     return await asyncio.to_thread(
-        search_similar, query_embedding, investigation_id, top_k, max_confidence_tier, min_score
+        _run_with_retry, search_similar, query_embedding, investigation_id,
+        top_k, max_confidence_tier, min_score,
     )
 
 
@@ -387,14 +422,18 @@ async def has_sufficient_context_async(
     min_results: int = 1,
 ) -> bool:
     return await asyncio.to_thread(
-        has_sufficient_context, dense_query_embedding, sparse_query_embedding,
+        _run_with_retry, has_sufficient_context, dense_query_embedding, sparse_query_embedding,
         investigation_id, min_results,
     )
 
 
 async def get_all_chunks_for_investigation_async(investigation_id: str, limit: int = 500) -> List[dict]:
-    return await asyncio.to_thread(get_all_chunks_for_investigation, investigation_id, limit)
+    return await asyncio.to_thread(_run_with_retry, get_all_chunks_for_investigation, investigation_id, limit)
 
 
 async def get_tier_coverage_summary_async(investigation_id: str) -> dict:
-    return await asyncio.to_thread(get_tier_coverage_summary, investigation_id)
+    return await asyncio.to_thread(_run_with_retry, get_tier_coverage_summary, investigation_id)
+
+
+async def delete_chunks_for_investigation_async(investigation_id: str) -> None:
+    await asyncio.to_thread(_run_with_retry, delete_chunks_for_investigation, investigation_id)

@@ -1,10 +1,13 @@
 """
 News fetcher (NewsAPI free tier, register at newsapi.org) and
-Google Places fetcher (free tier, enable at console.cloud.google.com).
+Google Places fetcher (free tier, enable at console.cloud.google.com --
+falls back to Serper's /places endpoint, same key as GoogleSearchFetcher,
+when GOOGLE_MAPS_API_KEY isn't configured).
 """
 import httpx
 from app.sources.base import BaseFetcher
 from app.schemas.source_document import SourceDocument, SourceType
+from app.sources.content_fetch_utils import enrich_with_full_content
 
 
 class NewsFetcher(BaseFetcher):
@@ -44,16 +47,25 @@ class NewsFetcher(BaseFetcher):
                     fetch_error="no recent articles found",
                 )
 
+            # NewsAPI's free tier truncates `content` itself, but `url`
+            # points at the real article -- fetch it directly (same
+            # pattern as bd_news_source.py) instead of settling for the
+            # short `description` field.
+            articles = await enrich_with_full_content(
+                articles, link_field="url", content_field="description"
+            )
+
             lines = []
             for a in articles:
                 lines.append(
                     f"[{a.get('source', {}).get('name')}] {a.get('publishedAt')}: "
-                    f"{a.get('title')} -- {(a.get('description') or '')[:250]}"
+                    f"{a.get('title')} -- {a.get('description') or ''}"
                 )
 
             return SourceDocument(
                 source_type=self.source_type,
                 source_name="News",
+                origin_url=f"https://news.google.com/search?q={company_name}",
                 title=f"News coverage of {company_name}",
                 raw_text="\n\n".join(lines),
                 fetch_succeeded=True,
@@ -63,16 +75,56 @@ class NewsFetcher(BaseFetcher):
 class GoogleMapsFetcher(BaseFetcher):
     source_type = SourceType.GOOGLE_MAPS
 
+    async def _fetch_via_serper_places(self, company_name: str, serper_api_key: str) -> SourceDocument:
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            resp = await client.post(
+                "https://google.serper.dev/places",
+                headers={"X-API-KEY": serper_api_key, "Content-Type": "application/json"},
+                json={"q": company_name, "num": 5},
+            )
+            resp.raise_for_status()
+            places = resp.json().get("places", [])
+
+            if not places:
+                return SourceDocument(
+                    source_type=self.source_type,
+                    source_name="Google Maps (via search)",
+                    raw_text="",
+                    fetch_succeeded=False,
+                    fetch_error="no matching business listing found",
+                )
+
+            lines = []
+            for p in places:
+                bits = [f"Location: {p.get('title')}", f"Address: {p.get('address')}"]
+                if p.get("phoneNumber"):
+                    bits.append(f"Phone: {p.get('phoneNumber')}")
+                if p.get("rating"):
+                    bits.append(f"Rating: {p.get('rating')} ({p.get('ratingCount', 0)} reviews)")
+                lines.append(" | ".join(bits))
+
+            return SourceDocument(
+                source_type=self.source_type,
+                source_name="Google Maps (via search)",
+                origin_url=f"https://www.google.com/maps/search/{company_name}",
+                title=places[0].get("title"),
+                raw_text="\n".join(lines),
+                fetch_succeeded=True,
+            )
+
     async def _fetch_impl(self, company_name: str, **kwargs) -> SourceDocument:
         api_key = kwargs.get("google_maps_api_key")
         if not api_key:
-            return SourceDocument(
-                source_type=self.source_type,
-                source_name="Google Maps",
-                raw_text="",
-                fetch_succeeded=False,
-                fetch_error="GOOGLE_MAPS_API_KEY not configured -- skipping",
-            )
+            serper_api_key = kwargs.get("serper_api_key")
+            if not serper_api_key:
+                return SourceDocument(
+                    source_type=self.source_type,
+                    source_name="Google Maps",
+                    raw_text="",
+                    fetch_succeeded=False,
+                    fetch_error="GOOGLE_MAPS_API_KEY and SERPER_API_KEY both not configured -- skipping",
+                )
+            return await self._fetch_via_serper_places(company_name, serper_api_key)
 
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
             find_resp = await client.get(

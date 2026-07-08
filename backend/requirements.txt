@@ -15,6 +15,7 @@ aiosqlite               # local dev/demo fallback when DATABASE_URL isn't config
 
 # --- AI / LLM ---
 groq
+google-genai             # Gemini fallback when Groq's daily quota is exhausted
 tenacity                # retry wrapper around Groq calls
 
 # --- RAG / vector store ---
@@ -33,6 +34,10 @@ httpx
 beautifulsoup4
 trafilatura             # clean main-content extraction
 lxml
+feedparser               # RSS parsing for Bangladesh news sources
+truststore               # OS-native cert verification -- fixes sites with an
+                         # incomplete cert chain (e.g. DSE/CSE) that a static
+                         # bundle can't complete but the OS trust store can
 
 # --- Data / ratios ---
 pandas

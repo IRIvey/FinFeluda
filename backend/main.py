@@ -1,3 +1,12 @@
+import truststore
+truststore.inject_into_ssl()
+# Must run before any other import that might create an httpx/SSL client
+# (e.g. qdrant_service.py's module-level QdrantClient). Uses the OS's own
+# certificate store instead of the static certifi bundle -- some sites
+# (confirmed: Bangladesh's DSE, CSE stock exchanges) serve an incomplete
+# cert chain that certifi can't complete but the OS trust store can
+# (via AIA chasing), without disabling verification.
+
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

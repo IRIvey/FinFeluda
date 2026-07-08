@@ -28,3 +28,7 @@ export async function getInvestigationSources(id) {
   const { data } = await apiClient.get(`/investigations/${id}/sources`);
   return data;
 }
+
+export async function deleteInvestigation(id) {
+  await apiClient.delete(`/investigations/${id}`);
+}

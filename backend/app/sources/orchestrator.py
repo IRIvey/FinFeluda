@@ -10,11 +10,16 @@ from typing import Optional
 from app.schemas.source_document import SourceDocument, SourceType, ConfidenceTier
 from app.sources.wikipedia_source import WikipediaFetcher
 from app.sources.github_source import GitHubFetcher
-from app.sources.sec_edgar_source import SECEdgarFetcher
 from app.sources.reddit_source import RedditFetcher
 from app.sources.misc_sources import NewsFetcher, GoogleMapsFetcher
 from app.sources.youtube_search_sources import YouTubeFetcher, GoogleSearchFetcher
 from app.sources.glassdoor_source import GlassdoorFetcher
+from app.sources.bd_news_source import BDNewsFetcher
+from app.sources.bdjobs_source import BdJobsFetcher
+from app.sources.bd_regulatory_source import (
+    DSEFetcher, CSEFetcher, RJSCFetcher, BSECFetcher, BangladeshBankFetcher, MCCIFetcher,
+)
+from app.sources.wayback_source import fetch_wayback_snapshots
 from app.services.pdf_service import extract_text_from_pdf
 from app.services.crawler_service import crawl_website
 from app.core.config import settings
@@ -24,13 +29,20 @@ logger = logging.getLogger(__name__)
 PUBLIC_FETCHERS = [
     WikipediaFetcher(),
     GitHubFetcher(),
-    SECEdgarFetcher(),
     RedditFetcher(),
     NewsFetcher(),
     GoogleMapsFetcher(),
     YouTubeFetcher(),
     GoogleSearchFetcher(),
     GlassdoorFetcher(),
+    BDNewsFetcher(),
+    BdJobsFetcher(),
+    DSEFetcher(),
+    CSEFetcher(),
+    RJSCFetcher(),
+    BSECFetcher(),
+    BangladeshBankFetcher(),
+    MCCIFetcher(),
 ]
 
 
@@ -136,6 +148,7 @@ async def gather_all(
         tasks.append(gather_pdf_documents(pdf_paths))
     if website_url:
         tasks.append(gather_website_document(website_url))
+        tasks.append(fetch_wayback_snapshots(website_url))
 
     results = await asyncio.gather(*tasks)
 

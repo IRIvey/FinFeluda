@@ -11,11 +11,11 @@ from app.schemas.llm_outputs import (
     RiskAnalysisResult,
     ExecutiveSummaryResult,
     RecommendationsResult,
+    SummaryAndRecommendationsResult,
 )
 from app.prompts.extraction import build_extraction_prompt
 from app.prompts.analysis import build_risk_analysis_prompt
-from app.prompts.summary import build_executive_summary_prompt
-from app.prompts.recommendations import build_recommendations_prompt
+from app.prompts.summary import build_summary_and_recommendations_prompt
 from app.services.groq_service import call_groq_structured
 
 logger = logging.getLogger(__name__)
@@ -39,14 +39,15 @@ def _field(chunk, name: str):
     return chunk[name] if isinstance(chunk, dict) else getattr(chunk, name)
 
 
-def _chunks_to_tagged_dicts(chunks: list) -> list[dict]:
+def _chunks_to_tagged_dicts(chunks: list, max_chars: int = MAX_PROMPT_CHARS) -> list[dict]:
+    """max_chars is overridable per caller."""
     sorted_chunks = sorted(chunks, key=lambda c: _field(c, "confidence_tier"))
 
     selected: list[dict] = []
     total_chars = 0
     for c in sorted_chunks[:MAX_CHUNKS_PER_PROMPT]:
         text = _field(c, "text")
-        if selected and total_chars + len(text) > MAX_PROMPT_CHARS:
+        if selected and total_chars + len(text) > max_chars:
             break
         selected.append(
             {
@@ -108,36 +109,35 @@ def analyze_risk(
     )
 
 
-def generate_executive_summary(
+def generate_summary_and_recommendations(
     company_name: str,
     extraction: FinancialExtractionResult,
     risk: RiskAnalysisResult,
-) -> ExecutiveSummaryResult:
-    prompt = build_executive_summary_prompt(
+) -> tuple[ExecutiveSummaryResult, RecommendationsResult]:
+    """One Groq call producing both the executive summary and the
+    recommendations -- previously two separate calls that both only ever
+    depended on extraction+risk (never raw chunks), so nothing but
+    request overhead (system prompt, schema dump, duplicated
+    extraction/risk dump) was being duplicated. Splits the combined
+    result back into the two existing types immediately so nothing
+    downstream (persistence, API schemas) needs to change."""
+    prompt = build_summary_and_recommendations_prompt(
         company_name=company_name,
         extracted_financials=extraction.model_dump(),
         risk_analysis=risk.model_dump(),
     )
-    return call_groq_structured(
+    combined = call_groq_structured(
         prompt=prompt,
-        schema=ExecutiveSummaryResult,
-        system="You are writing for sophisticated investors. Be precise and specific.",
+        schema=SummaryAndRecommendationsResult,
+        system="You are writing for sophisticated investors. Be precise and specific. "
+               "Every recommendation must include a concrete rationale tied to the data.",
     )
-
-
-def generate_recommendations(
-    company_name: str,
-    extraction: FinancialExtractionResult,
-    risk: RiskAnalysisResult,
-) -> RecommendationsResult:
-    prompt = build_recommendations_prompt(
-        company_name=company_name,
-        extracted_financials=extraction.model_dump(),
-        risk_analysis=risk.model_dump(),
+    summary = ExecutiveSummaryResult(
+        company_summary=combined.company_summary,
+        financial_summary=combined.financial_summary,
+        major_risks=combined.major_risks,
+        opportunities=combined.opportunities,
+        future_outlook=combined.future_outlook,
     )
-    return call_groq_structured(
-        prompt=prompt,
-        schema=RecommendationsResult,
-        system="Every recommendation must include a concrete rationale tied to the data. "
-               "Never output a recommendation without explaining why.",
-    )
+    recommendations = RecommendationsResult(recommendations=combined.recommendations)
+    return summary, recommendations

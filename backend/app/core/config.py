@@ -19,13 +19,18 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
+    # --- Gemini (fallback when Groq's free-tier daily quota is exhausted --
+    # see groq_service.py) ---
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.5-flash-lite"
+
     # --- Qdrant ---
     QDRANT_URL: str
     QDRANT_API_KEY: str
     QDRANT_COLLECTION: str = "due_diligence"
 
     # --- Embeddings ---
-    EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
+    EMBEDDING_MODEL: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
     # --- Cloudinary ---
     CLOUDINARY_CLOUD_NAME: str

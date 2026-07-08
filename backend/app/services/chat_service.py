@@ -238,10 +238,28 @@ def _to_chat_sources(reranked_chunks: list[dict]) -> list[ChatSource]:
     return sources
 
 
+def _build_retrieval_query(question: str, recent_history: list[dict]) -> str:
+    """
+    Retrieval was embedding the bare current question with zero awareness
+    of conversation context -- a follow-up like "what about last year?"
+    or "why?" would retrieve on almost nothing, even though the previous
+    turn (already fetched for the generation prompt) makes clear what
+    it's actually asking about. Prepending the last user turn gives
+    retrieval the same context resolution the generation prompt already
+    had, without a separate LLM rewrite call -- real query rewriting
+    would need one, and this flow already makes enough Groq calls.
+    """
+    last_user_turns = [t["content"] for t in recent_history if t.get("role") == "user"]
+    if not last_user_turns:
+        return question
+    return f"{last_user_turns[-1]} {question}"
+
+
 async def answer_question(db: AsyncSession, investigation_id: str, question: str) -> ChatResponse:
     topics = classify_topics(question)
     structured_context = await _build_structured_context(db, investigation_id, topics)
     recent_history = await _get_recent_history(db, investigation_id)
+    retrieval_query = _build_retrieval_query(question, recent_history)
 
     # Persist the user's turn immediately -- so it's saved even if
     # generation fails below, and reopening this chat later never loses
@@ -249,8 +267,8 @@ async def answer_question(db: AsyncSession, investigation_id: str, question: str
     await _persist_message(db, investigation_id, "user", question)
 
     dense_emb, sparse_emb = await asyncio.gather(
-        generate_query_embedding_async(question),
-        generate_sparse_query_embedding_async(question),
+        generate_query_embedding_async(retrieval_query),
+        generate_sparse_query_embedding_async(retrieval_query),
     )
 
     sufficient = await has_sufficient_context_async(dense_emb, sparse_emb, investigation_id)
@@ -267,7 +285,10 @@ async def answer_question(db: AsyncSession, investigation_id: str, question: str
     hybrid_results = await search_hybrid_async(
         dense_emb, sparse_emb, investigation_id, top_k=20
     )
-    reranked = await rerank_chunks_async(question, hybrid_results, top_n=6)
+    # Same context-resolution reasoning as the embedding step -- the
+    # cross-encoder also needs to know what a follow-up is really asking
+    # about, not just the bare trailing question.
+    reranked = await rerank_chunks_async(retrieval_query, hybrid_results, top_n=6)
 
     investigation = await db.get(Investigation, investigation_id)
     company_name = (investigation.company_name if investigation else None) or "this company"

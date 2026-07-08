@@ -15,6 +15,7 @@ from app.core.database import AsyncSessionLocal
 from app.models.investigation import Investigation, InvestigationStatus
 from app.services.qdrant_service import get_all_chunks_for_investigation_async
 from app.services.investigation_service import run_reason_stage
+from app.services.persistence_service import mark_investigation_failed
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -28,7 +29,16 @@ _RE_ANALYZABLE_STATUSES = {
 
 async def _rerun(investigation_id: str, company_name: str):
     async with AsyncSessionLocal() as db:
-        chunks = await get_all_chunks_for_investigation_async(investigation_id)
+        try:
+            chunks = await get_all_chunks_for_investigation_async(investigation_id)
+        except Exception as exc:
+            # A Qdrant connectivity blip here happens before run_reason_stage
+            # (and its own try/except) ever starts, so without this the
+            # investigation is left silently stuck at its previous status
+            # forever instead of surfacing the failure.
+            logger.exception("Failed to fetch stored chunks for %s", investigation_id)
+            await mark_investigation_failed(db, investigation_id, str(exc))
+            return
         await run_reason_stage(db, investigation_id, company_name, chunks)
 
 

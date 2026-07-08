@@ -4,15 +4,16 @@ gathering has finished, and fetches the full detail from GET /{id}
 once analysis (REASON stage) has persisted company/financial/risk/
 report data alongside the investigation row.
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from app.core.dependencies import get_database
 from app.models.investigation import Investigation
 from app.models.company import Company
 from app.models.financial import Financial
 from app.models.risk import Risk
 from app.models.report import Report
+from app.models.chat_message import ChatMessage
 from app.schemas.investigation import (
     InvestigationOut,
     InvestigationDetailOut,
@@ -21,7 +22,10 @@ from app.schemas.investigation import (
     ReportRefOut,
     SourceOut,
 )
-from app.services.qdrant_service import get_all_chunks_for_investigation_async
+from app.services.qdrant_service import (
+    get_all_chunks_for_investigation_async,
+    delete_chunks_for_investigation_async,
+)
 from typing import List
 
 router = APIRouter()
@@ -133,6 +137,20 @@ async def get_investigation_sources(investigation_id: str, db: AsyncSession = De
 
     sources = sorted(grouped.values(), key=lambda s: (s["confidence_tier"], s["source_name"]))
     return sources
+
+
+@router.delete("/{investigation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_investigation(investigation_id: str, db: AsyncSession = Depends(get_database)):
+    investigation = await db.get(Investigation, investigation_id)
+    if investigation is None:
+        raise HTTPException(status_code=404, detail="Investigation not found")
+
+    for model in (Company, Financial, Risk, Report, ChatMessage):
+        await db.execute(delete(model).where(model.investigation_id == investigation_id))
+    await db.delete(investigation)
+    await db.commit()
+
+    await delete_chunks_for_investigation_async(investigation_id)
 
 
 @router.get("/{investigation_id}/status")

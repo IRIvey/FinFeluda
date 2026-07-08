@@ -70,4 +70,9 @@ or findings from the evidence above rather than generic statements. Use the rece
 conversation only to understand what the current question is referring to, not as a
 source of facts. If the evidence above genuinely doesn't cover this question, say
 plainly that this investigation's data doesn't cover it rather than fabricating an answer.
+
+If the retrieved excerpts conflict with each other (e.g. a tier 1/2 source claims one
+thing and a tier 3/4 source suggests something different), do not silently pick one --
+say so explicitly and note which side has the stronger source. Never blend contradictory
+figures into a single averaged-sounding answer.
 """

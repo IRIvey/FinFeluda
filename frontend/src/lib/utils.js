@@ -45,6 +45,13 @@ export const SEVERITY_META = {
   critical: { label: "Critical", color: "risk-critical" },
 };
 
+export const SENTIMENT_META = {
+  positive: { label: "Positive", color: "tier-1" },
+  negative: { label: "Negative", color: "risk-critical" },
+  neutral: { label: "Neutral", color: "tier-4" },
+  mixed: { label: "Mixed", color: "tier-3" },
+};
+
 export const CONFIDENCE_TIER_META = {
   1: { label: "Authoritative", color: "tier-1" },
   2: { label: "Official", color: "tier-2" },

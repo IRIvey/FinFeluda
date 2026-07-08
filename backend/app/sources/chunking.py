@@ -32,8 +32,13 @@ TIER_CHUNK_PROFILE: dict[ConfidenceTier, tuple[int, int]] = {
 DEFAULT_PROFILE = (1000, 150)
 
 # Split on paragraph breaks first, then sentence breaks within a paragraph.
+# The lookbehind/lookahead cover both Latin terminators (.!?) and the Bangla
+# dari (।) -- Bangla has no letter case, so the lookahead also accepts the
+# Bengali Unicode block (ঀ-৿) alongside capitals/digits, otherwise
+# a Bangla-only paragraph never matches and falls through to the hard-slice
+# fallback below instead of splitting cleanly on sentence boundaries.
 _PARAGRAPH_SPLIT = re.compile(r"\n\s*\n+")
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?।])\s+(?=[A-Z0-9ঀ-৿])")
 
 
 def _split_into_sentences(paragraph: str) -> list[str]:

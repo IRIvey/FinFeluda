@@ -83,3 +83,18 @@ class RecommendationItem(BaseModel):
 
 class RecommendationsResult(BaseModel):
     recommendations: list[RecommendationItem]
+
+
+class SummaryAndRecommendationsResult(BaseModel):
+    """Combined output of what used to be two separate Groq calls
+    (ExecutiveSummaryResult + RecommendationsResult) -- both take the
+    exact same inputs (extraction + risk, no raw chunks) and neither
+    benefited from being separate, so merging them cuts one full
+    system-prompt/schema/extraction-dump round trip per investigation
+    without touching chunk budgets or output quality."""
+    company_summary: str
+    financial_summary: str
+    major_risks: str
+    opportunities: str
+    future_outlook: str
+    recommendations: list[RecommendationItem]
