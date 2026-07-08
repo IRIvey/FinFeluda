@@ -5,8 +5,11 @@ import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Skeleton } from "../components/ui/Skeleton";
 import { EmptyState } from "../components/ui/EmptyState";
+import { DistributionBar } from "../components/charts/DistributionBar";
 import { useInvestigation } from "../hooks/useInvestigation";
 import { SEVERITY_META, scoreTone } from "../lib/utils";
+
+const SEVERITY_ORDER = ["low", "medium", "high", "critical"];
 
 const CATEGORY_META = {
   financial: {
@@ -98,7 +101,16 @@ export function RiskCategoryPage() {
                 yet.
               </EmptyState>
             ) : (
-              <ul className="flex flex-col gap-4">
+              <>
+                <DistributionBar
+                  className="mb-5"
+                  segments={SEVERITY_ORDER.map((sev) => ({
+                    label: SEVERITY_META[sev].label,
+                    color: SEVERITY_META[sev].color,
+                    value: redFlags.filter((f) => f.severity === sev).length,
+                  }))}
+                />
+                <ul className="flex flex-col gap-4">
                 {redFlags.map((flag, index) => {
                   const severity = SEVERITY_META[flag.severity] ?? SEVERITY_META.medium;
                   return (
@@ -125,7 +137,8 @@ export function RiskCategoryPage() {
                     </li>
                   );
                 })}
-              </ul>
+                </ul>
+              </>
             )}
           </Card>
         </div>

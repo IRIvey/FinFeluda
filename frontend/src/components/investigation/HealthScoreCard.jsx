@@ -1,5 +1,6 @@
 import { Card } from "../ui/Card";
 import { EmptyState } from "../ui/EmptyState";
+import { SubscoreBarChart } from "../charts/SubscoreBarChart";
 import { scoreTone } from "../../lib/utils";
 
 const SUBSCORE_LABELS = ["growth", "liquidity", "profitability", "debt", "efficiency"];
@@ -18,14 +19,13 @@ export function HealthScoreCard({ healthScore, subscores }) {
 
       <div className="mt-5">
         {subscores ? (
-          <ul className="flex flex-col gap-2">
-            {SUBSCORE_LABELS.filter((key) => subscores[key] !== undefined).map((key) => (
-              <li key={key} className="flex items-center justify-between text-sm">
-                <span className="capitalize text-ink-muted">{key}</span>
-                <span className="data-figure font-medium text-ink">{subscores[key]}</span>
-              </li>
-            ))}
-          </ul>
+          <SubscoreBarChart
+            data={SUBSCORE_LABELS.filter((key) => subscores[key] !== undefined).map((key) => ({
+              label: key.charAt(0).toUpperCase() + key.slice(1),
+              value: subscores[key],
+              tone: scoreTone(subscores[key]),
+            }))}
+          />
         ) : (
           <EmptyState>
             Growth, liquidity, profitability, debt, and efficiency sub-scores aren't broken out for
